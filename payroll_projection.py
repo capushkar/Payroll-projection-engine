@@ -46,6 +46,21 @@ st.markdown("""
         font-size: 28px;
         font-weight: 600;
         color: #111827;
+        -webkit-text-fill-color: #111827;
+        font-family: 'DM Serif Display', serif;
+    }
+    .metric-value-red {
+        font-size: 28px;
+        font-weight: 600;
+        color: #DC2626 !important;
+        -webkit-text-fill-color: #DC2626 !important;
+        font-family: 'DM Serif Display', serif;
+    }
+    .metric-value-green {
+        font-size: 28px;
+        font-weight: 600;
+        color: #065F46 !important;
+        -webkit-text-fill-color: #065F46 !important;
         font-family: 'DM Serif Display', serif;
     }
     .metric-sub {
@@ -893,7 +908,7 @@ with tab2:
             with cb2:
                 st.markdown(f"""<div class='metric-card'>
                     <div class='metric-label'>Budget Variance</div>
-                    <div class='metric-value' style='color:{variance_color} !important; -webkit-text-fill-color:{variance_color} !important;'>${total_variance:+,.0f}</div>
+                    <div class='{"metric-value-red" if total_variance > 0 else "metric-value-green"}'>${total_variance:+,.0f}</div>
                     <div class='metric-sub'>{variance_label} by {variance_pct:.1f}%</div>
                 </div>""", unsafe_allow_html=True)
             with cb3:
@@ -901,7 +916,7 @@ with tab2:
                 util_color = "#DC2626" if utilization > 100 else "#1B4332"
                 st.markdown(f"""<div class='metric-card'>
                     <div class='metric-label'>Budget Utilization</div>
-                    <div class='metric-value' style='color:{util_color} !important; -webkit-text-fill-color:{util_color} !important;'>{utilization:.1f}%</div>
+                    <div class='{"metric-value-red" if utilization > 100 else "metric-value-green"}'>{utilization:.1f}%</div>
                     <div class='metric-sub'>Actual CTC vs total budget</div>
                 </div>""", unsafe_allow_html=True)
 
