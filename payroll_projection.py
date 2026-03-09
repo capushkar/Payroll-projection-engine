@@ -480,7 +480,7 @@ def calculate_monthly_salary(row, month_date, raise_pct, benefits_pct, payroll_t
 
         future_raises = 0
         check = next_anniversary(hire_date, today)
-        while check <= month_date:
+        while check <= month_end:  # use month_end so raise applies in the anniversary month
             future_raises += 1
             try:
                 check = hire_date.replace(year=check.year + 1)
@@ -654,6 +654,12 @@ def sample_data():
         {"Employee ID": "E006", "Employee Name": "Frank Miller", "Department": "Engineering",
          "Base Salary": 130000, "Annual Bonus": 12, "Bonus Type": "% of Base",
          "Hire Date": "2017-09-01", "Status": "active", "FTE": 1.0, "Annual Raise %": ""},
+        {"Employee ID": "E007", "Employee Name": "Grace Kim", "Department": "Finance",
+         "Base Salary": 92000, "Annual Bonus": 8, "Bonus Type": "% of Base",
+         "Hire Date": "2026-06-20", "Status": "active", "FTE": 1.0, "Annual Raise %": ""},
+        {"Employee ID": "E008", "Employee Name": "Henry Torres", "Department": "Engineering",
+         "Base Salary": 105000, "Annual Bonus": 10500, "Bonus Type": "Fixed $",
+         "Hire Date": "2023-02-14", "Status": "active", "FTE": 1.0, "Annual Raise %": ""},
     ])
 
 
