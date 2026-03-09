@@ -429,7 +429,34 @@ def calculate_monthly_salary(row, month_date, raise_pct, benefits_pct, payroll_t
             return float(val.replace("$", "").replace(",", "").strip() or 0)
         return float(val or 0)
     base = clean_currency(row.get("Base Salary", 0))
-    bonus = clean_currency(row.get("Annual Bonus", 0))
+
+    # FTE % — defaults to 1.0 if not provided
+    fte = float(row.get("FTE", 1.0) or 1.0)
+    fte = max(0.0, min(1.0, fte))  # clamp between 0 and 1
+
+    # Per-employee raise override — optional column, overrides sidebar %
+    emp_raise = row.get("Annual Raise %", None)
+    if emp_raise is not None and str(emp_raise).strip() not in ["", "nan", "None"]:
+        try:
+            effective_raise = float(str(emp_raise).replace("%", "").strip()) / 100
+        except:
+            effective_raise = raise_pct
+    else:
+        effective_raise = raise_pct
+
+    # Bonus — fixed dollar or % of base
+    bonus_raw = row.get("Annual Bonus", 0)
+    bonus_type = str(row.get("Bonus Type", "Fixed $")).strip()
+    if bonus_type == "% of Base":
+        try:
+            bonus_pct_val = float(str(bonus_raw).replace("%", "").replace("$", "").strip() or 0)
+        except:
+            bonus_pct_val = 0.0
+        # bonus will be calculated after adj_base is known
+        bonus_is_pct = True
+    else:
+        bonus = clean_currency(bonus_raw)
+        bonus_is_pct = False
 
     # Inactive / terminated employees
     if status in ["inactive", "terminated"]:
@@ -442,12 +469,9 @@ def calculate_monthly_salary(row, month_date, raise_pct, benefits_pct, payroll_t
         return 0.0, 0.0, 0.0, 0.0
 
     # ── Raise logic ──────────────────────────────────────────────────
-    # Base salary in the file = current salary as of today.
-    # Count only future raise events between today and month_date.
     today = date.today()
 
     if increment_model == "Anniversary Date":
-        # Raise on each employee's hire anniversary
         def next_anniversary(hd, from_date):
             ann = hd.replace(year=from_date.year)
             if ann < from_date:
@@ -462,11 +486,9 @@ def calculate_monthly_salary(row, month_date, raise_pct, benefits_pct, payroll_t
                 check = hire_date.replace(year=check.year + 1)
             except ValueError:
                 check = hire_date.replace(year=check.year + 1, day=28)
-        adj_base = base * ((1 + raise_pct) ** future_raises)
+        adj_base = base * ((1 + effective_raise) ** future_raises)
 
     elif increment_model == "Fiscal Year Start — Full Raise":
-        # Everyone gets full raise on fiscal year start date
-        # Find next fiscal year start on or after today
         def next_fiscal_start(from_date, fy_month):
             fs = from_date.replace(month=fy_month, day=1)
             if fs < from_date:
@@ -475,17 +497,13 @@ def calculate_monthly_salary(row, month_date, raise_pct, benefits_pct, payroll_t
 
         future_raises = 0
         check = next_fiscal_start(today, fiscal_start_month)
-        # Only count raises after the employee's hire date
         while check <= month_date:
             if check > hire_date:
                 future_raises += 1
             check = check.replace(year=check.year + 1)
-        adj_base = base * ((1 + raise_pct) ** future_raises)
+        adj_base = base * ((1 + effective_raise) ** future_raises)
 
     else:
-        # Fiscal Year Start — Prorated First Year
-        # First raise cycle: raise_pct × (months_remaining_in_fy / 12)
-        # All subsequent raises: full raise_pct
         def next_fiscal_start(from_date, fy_month):
             fs = from_date.replace(month=fy_month, day=1)
             if fs < from_date:
@@ -499,18 +517,20 @@ def calculate_monthly_salary(row, month_date, raise_pct, benefits_pct, payroll_t
         while check <= month_date:
             if check > hire_date:
                 if first_raise:
-                    # Calculate months from hire date to this fiscal year start
                     months_before_fy = (check.year - hire_date.year) * 12 + (check.month - hire_date.month)
                     months_worked_in_cycle = min(months_before_fy, 12)
-                    prorated_raise = raise_pct * (months_worked_in_cycle / 12)
+                    prorated_raise = effective_raise * (months_worked_in_cycle / 12)
                     adj_base = adj_base * (1 + prorated_raise)
                     first_raise = False
                 else:
-                    adj_base = adj_base * (1 + raise_pct)
+                    adj_base = adj_base * (1 + effective_raise)
             check = check.replace(year=check.year + 1)
 
-    monthly_base = adj_base / 12
+    # If bonus is % of base, calculate against projected (post-raise) salary
+    if bonus_is_pct:
+        bonus = adj_base * (bonus_pct_val / 100)
 
+    monthly_base = (adj_base / 12) * fte
 
     # Proration for hire month
     month_start = month_date.replace(day=1)
@@ -519,7 +539,7 @@ def calculate_monthly_salary(row, month_date, raise_pct, benefits_pct, payroll_t
     days_worked = max(0, (month_end - hire_month_start).days + 1)
     monthly_base_prorated = monthly_base * days_worked / days_in_month if days_worked < days_in_month else monthly_base
 
-    # Bonus payout based on selected frequency
+    # Bonus payout based on selected frequency (also scaled by FTE)
     BONUS_MONTHS = {
         "Quarterly (Q1/Q2/Q3/Q4)": {1, 4, 7, 10},
         "Semi-Annual (Jun/Dec)":    {6, 12},
@@ -527,7 +547,7 @@ def calculate_monthly_salary(row, month_date, raise_pct, benefits_pct, payroll_t
     }
     payout_months = BONUS_MONTHS.get(bonus_frequency, {1, 4, 7, 10})
     num_payouts = len(payout_months)
-    bonus_month = (bonus / num_payouts) if month_date.month in payout_months else 0.0
+    bonus_month = ((bonus * fte) / num_payouts) if month_date.month in payout_months else 0.0
 
     gross = monthly_base_prorated + bonus_month
     benefits = gross * benefits_pct
@@ -617,17 +637,23 @@ def run_projection(df, start_date, months, raise_pct, benefits_pct, payroll_tax_
 def sample_data():
     return pd.DataFrame([
         {"Employee ID": "E001", "Employee Name": "Alice Johnson", "Department": "Engineering",
-         "Base Salary": 120000, "Annual Bonus": 12000, "Hire Date": "2020-03-15", "Status": "active"},
+         "Base Salary": 120000, "Annual Bonus": 10, "Bonus Type": "% of Base",
+         "Hire Date": "2020-03-15", "Status": "active", "FTE": 1.0, "Annual Raise %": ""},
         {"Employee ID": "E002", "Employee Name": "Bob Smith", "Department": "Finance",
-         "Base Salary": 95000, "Annual Bonus": 9500, "Hire Date": "2019-07-01", "Status": "active"},
+         "Base Salary": 95000, "Annual Bonus": 9500, "Bonus Type": "Fixed $",
+         "Hire Date": "2019-07-01", "Status": "active", "FTE": 1.0, "Annual Raise %": ""},
         {"Employee ID": "E003", "Employee Name": "Carol White", "Department": "Engineering",
-         "Base Salary": 110000, "Annual Bonus": 11000, "Hire Date": "2021-11-20", "Status": "active"},
+         "Base Salary": 110000, "Annual Bonus": 10, "Bonus Type": "% of Base",
+         "Hire Date": "2021-11-20", "Status": "active", "FTE": 1.0, "Annual Raise %": 6},
         {"Employee ID": "E004", "Employee Name": "David Lee", "Department": "HR",
-         "Base Salary": 75000, "Annual Bonus": 5000, "Hire Date": "2022-01-10", "Status": "active"},
+         "Base Salary": 75000, "Annual Bonus": 5000, "Bonus Type": "Fixed $",
+         "Hire Date": "2022-01-10", "Status": "active", "FTE": 0.5, "Annual Raise %": ""},
         {"Employee ID": "E005", "Employee Name": "Emma Davis", "Department": "Finance",
-         "Base Salary": 88000, "Annual Bonus": 8000, "Hire Date": "2018-05-22", "Status": "inactive"},
+         "Base Salary": 88000, "Annual Bonus": 8000, "Bonus Type": "Fixed $",
+         "Hire Date": "2018-05-22", "Status": "inactive", "FTE": 1.0, "Annual Raise %": ""},
         {"Employee ID": "E006", "Employee Name": "Frank Miller", "Department": "Engineering",
-         "Base Salary": 130000, "Annual Bonus": 15000, "Hire Date": "2017-09-01", "Status": "active"},
+         "Base Salary": 130000, "Annual Bonus": 12, "Bonus Type": "% of Base",
+         "Hire Date": "2017-09-01", "Status": "active", "FTE": 1.0, "Annual Raise %": ""},
     ])
 
 
@@ -658,7 +684,7 @@ with st.sidebar:
     st.markdown("<small>Industry avg: 3.5%</small>", unsafe_allow_html=True)
 
     benefits_pct = st.slider("Benefits Load (%)", 0.0, 50.0, 20.0, 1.0) / 100
-    st.markdown("<small>Industry avg: 29.8%</small>", unsafe_allow_html=True)
+    st.markdown("<small>Includes health, dental, vision, retirement (401k match), and other employer-paid benefits. Industry avg: 29.8%</small>", unsafe_allow_html=True)
 
     payroll_tax_pct = st.slider("Payroll Tax (%)", 0.0, 20.0, 7.65, 0.5) / 100
     st.markdown("<small>Industry avg: 10.0%</small>", unsafe_allow_html=True)
@@ -748,10 +774,14 @@ with tab1:
         st.markdown('<div class="section-header">Expected Format</div>', unsafe_allow_html=True)
         st.markdown("""
 <div class='info-box'>
-Your file should have these columns:<br><br>
+<b>Required columns:</b><br>
 <b>Employee ID</b> · <b>Employee Name</b> · <b>Department</b><br>
 <b>Base Salary</b> · <b>Annual Bonus</b> · <b>Hire Date</b> · <b>Status</b>
 <br><br>
+<b>Optional columns:</b><br>
+<b>Bonus Type</b> — <code>Fixed $</code> (default) or <code>% of Base</code><br>
+<b>FTE</b> — e.g. <code>0.5</code> for part-time, <code>1.0</code> for full-time (default)<br>
+<b>Annual Raise %</b> — per-employee raise, overrides sidebar (e.g. <code>6</code> for 6%)<br><br>
 Status values: <code>active</code> or <code>inactive</code><br>
 Hire Date format: <code>YYYY-MM-DD</code> or <code>MM/DD/YYYY</code>
 </div>
@@ -951,7 +981,31 @@ with tab2:
         )
         st.plotly_chart(fig, use_container_width=True)
 
-        # Detailed table
+        # Headcount trend
+        st.markdown('<div class="section-header">Monthly Headcount</div>', unsafe_allow_html=True)
+        headcount_monthly = result_df[result_df["Cost to Company"] > 0].groupby("Month_Date")["Employee Name"].nunique().reset_index()
+        headcount_monthly.columns = ["Month_Date", "Headcount"]
+        headcount_monthly["Month"] = headcount_monthly["Month_Date"].apply(lambda x: x.strftime("%b %Y"))
+
+        fig_hc = go.Figure()
+        fig_hc.add_trace(go.Bar(
+            x=headcount_monthly["Month"],
+            y=headcount_monthly["Headcount"],
+            marker_color="#40916C",
+            text=headcount_monthly["Headcount"],
+            textposition="outside",
+            textfont=dict(color="#374151", size=12)
+        ))
+        fig_hc.update_layout(
+            height=280,
+            plot_bgcolor="white", paper_bgcolor="white",
+            font=dict(family="DM Sans", color="#111827"),
+            yaxis=dict(gridcolor="#E5E7EB", tickfont=dict(color="#374151"),
+                      title="Headcount", title_font=dict(color="#374151")),
+            xaxis=dict(gridcolor="#E5E7EB", tickfont=dict(color="#374151")),
+            margin=dict(t=30, b=20)
+        )
+        st.plotly_chart(fig_hc, use_container_width=True)
         st.markdown('<div class="section-header">Monthly Detail by Employee</div>', unsafe_allow_html=True)
         display_cols = ["Month", "Employee Name", "Department", "Gross Pay", "Benefits", "Payroll Tax", "Cost to Company"]
         disp = result_df[display_cols].copy()
