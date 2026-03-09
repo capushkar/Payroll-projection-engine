@@ -757,6 +757,32 @@ with tab1:
         upload_mode = st.radio("Data Source", ["Upload Excel/CSV", "Use Sample Data"], horizontal=True)
 
         if upload_mode == "Upload Excel/CSV":
+            # Template download
+            template_df = pd.DataFrame([
+                {"Employee ID": "E001", "Employee Name": "Jane Smith", "Department": "Engineering",
+                 "Base Salary": 120000, "Annual Bonus": 10, "Bonus Type": "% of Base",
+                 "Hire Date": "2022-06-01", "Status": "active", "FTE": 1.0, "Annual Raise %": ""},
+                {"Employee ID": "E002", "Employee Name": "John Doe", "Department": "Finance",
+                 "Base Salary": 95000, "Annual Bonus": 9500, "Bonus Type": "Fixed $",
+                 "Hire Date": "2021-03-15", "Status": "active", "FTE": 1.0, "Annual Raise %": 6},
+                {"Employee ID": "E003", "Employee Name": "Sara Lee", "Department": "HR",
+                 "Base Salary": 70000, "Annual Bonus": 5000, "Bonus Type": "Fixed $",
+                 "Hire Date": "2023-09-01", "Status": "active", "FTE": 0.5, "Annual Raise %": ""},
+                {"Employee ID": "E004", "Employee Name": "Future Hire", "Department": "Engineering",
+                 "Base Salary": 110000, "Annual Bonus": 8, "Bonus Type": "% of Base",
+                 "Hire Date": "2026-07-01", "Status": "active", "FTE": 1.0, "Annual Raise %": ""},
+            ])
+            template_buffer = io.BytesIO()
+            with pd.ExcelWriter(template_buffer, engine="openpyxl") as writer:
+                template_df.to_excel(writer, index=False, sheet_name="Employees")
+            st.download_button(
+                "📥 Download Template",
+                data=template_buffer.getvalue(),
+                file_name="payroll_template.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                help="Download a pre-formatted Excel template with example rows"
+            )
+
             uploaded_file = st.file_uploader(
                 "Upload your employee file",
                 type=["xlsx", "csv"],
