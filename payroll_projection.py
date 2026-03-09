@@ -87,6 +87,7 @@ st.markdown("""
     .stButton > button {
         background-color: #1B4332 !important;
         color: white !important;
+        -webkit-text-fill-color: white !important;
         border: none !important;
         border-radius: 8px !important;
         padding: 10px 24px !important;
@@ -97,12 +98,43 @@ st.markdown("""
     .stButton > button:hover {
         background-color: #145a32 !important;
         color: white !important;
+        -webkit-text-fill-color: white !important;
     }
-    .stButton > button p, .stButton > button span {
+    .stButton > button p,
+    .stButton > button span,
+    .stButton > button div {
         color: white !important;
+        -webkit-text-fill-color: white !important;
     }
 
-    /* ── File uploader ── */
+    /* ── Download button ── */
+    .stDownloadButton > button {
+        background-color: #1B4332 !important;
+        color: white !important;
+        -webkit-text-fill-color: white !important;
+        border: none !important;
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+    }
+    .stDownloadButton > button:hover {
+        background-color: #145a32 !important;
+        color: white !important;
+        -webkit-text-fill-color: white !important;
+    }
+    .stDownloadButton > button p,
+    .stDownloadButton > button span {
+        color: white !important;
+        -webkit-text-fill-color: white !important;
+    }
+
+    /* ── Number input +/- stepper buttons ── */
+    .stNumberInput button,
+    .stNumberInput button p,
+    .stNumberInput button span {
+        color: white !important;
+        -webkit-text-fill-color: white !important;
+    }
+
     .stFileUploader {
         background-color: white !important;
         border-radius: 10px !important;
