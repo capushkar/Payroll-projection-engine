@@ -361,6 +361,7 @@ st.markdown("""
     [data-testid="stFileUploaderDropzoneInstructions"] small,
     [data-testid="stFileUploaderDropzoneInstructions"] div {
         color: #f8f7f4 !important;
+        -webkit-text-fill-color: #f8f7f4 !important;
         background-color: transparent !important;
     }
     /* Browse files button — override inherited white color from dark theme section */
@@ -892,7 +893,7 @@ with tab2:
             with cb2:
                 st.markdown(f"""<div class='metric-card'>
                     <div class='metric-label'>Budget Variance</div>
-                    <div class='metric-value' style='color:{variance_color};'>${total_variance:+,.0f}</div>
+                    <div class='metric-value' style='color:{variance_color} !important; -webkit-text-fill-color:{variance_color} !important;'>${total_variance:+,.0f}</div>
                     <div class='metric-sub'>{variance_label} by {variance_pct:.1f}%</div>
                 </div>""", unsafe_allow_html=True)
             with cb3:
@@ -900,7 +901,7 @@ with tab2:
                 util_color = "#DC2626" if utilization > 100 else "#1B4332"
                 st.markdown(f"""<div class='metric-card'>
                     <div class='metric-label'>Budget Utilization</div>
-                    <div class='metric-value' style='color:{util_color};'>{utilization:.1f}%</div>
+                    <div class='metric-value' style='color:{util_color} !important; -webkit-text-fill-color:{util_color} !important;'>{utilization:.1f}%</div>
                     <div class='metric-sub'>Actual CTC vs total budget</div>
                 </div>""", unsafe_allow_html=True)
 
