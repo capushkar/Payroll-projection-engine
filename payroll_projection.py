@@ -1143,8 +1143,12 @@ with tab4:
             with st.spinner("Running 3 scenarios..."):
                 scenarios = {}
                 for label, r in [("Scenario A", s_raise_a), ("Scenario B", s_raise_b), ("Scenario C", s_raise_c)]:
+                    # Make a copy with Annual Raise % cleared so simulation uses scenario raise, not per-employee override
+                    sim_df = df.copy()
+                    if "Annual Raise %" in sim_df.columns:
+                        sim_df["Annual Raise %"] = ""
                     sim = run_projection(
-                        df=df, start_date=start_month, months=projection_months,
+                        df=sim_df, start_date=start_month, months=projection_months,
                         raise_pct=r, benefits_pct=benefits_pct, payroll_tax_pct=payroll_tax_pct,
                         new_hires=[], terminations=[], dept_budgets={},
                         bonus_frequency=bonus_frequency,
@@ -1225,8 +1229,9 @@ with tab4:
                             row, month_date, raise_pct, benefits_pct, payroll_tax_pct,
                             bonus_frequency, increment_model, fiscal_start_month
                         )[3]
-                        base_cost += ctc
-                        att_cost += ctc * survival_prob
+                        if ctc and not pd.isna(ctc):
+                            base_cost += ctc
+                            att_cost += ctc * survival_prob
 
                     no_attrition_results.append({"Month_Date": month_date, "Cost": base_cost, "Scenario": "No Attrition"})
                     attrition_results.append({
@@ -1276,7 +1281,7 @@ with tab4:
                 col1, col2, col3 = st.columns(3)
                 col1.metric("Cost Without Attrition", f"${total_no_att:,.0f}")
                 col2.metric("Cost With Attrition", f"${total_att:,.0f}")
-                col3.metric("Total Cost Saving", f"${savings:,.0f}", delta=f"-{savings/total_no_att*100:.1f}%")
+                col3.metric("Total Cost Saving", f"${savings:,.0f}", delta=f"-{savings/total_no_att*100:.1f}%" if total_no_att > 0 else "N/A")
                 st.caption(f"Final headcount after {projection_months} months: **{final_headcount}** employees (started with {active_count})")
 
 # ─── Footer ────────────────────────────────────────────────────────────────────
