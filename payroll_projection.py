@@ -731,6 +731,14 @@ with st.sidebar:
     # Quick-run button in sidebar
     if st.button("▶ Run Payroll Projection", key="sidebar_run_btn", use_container_width=True):
         st.session_state["trigger_run"] = True
+        st.session_state["saved_raise_pct"] = raise_pct
+        st.session_state["saved_benefits_pct"] = benefits_pct
+        st.session_state["saved_payroll_tax_pct"] = payroll_tax_pct
+        st.session_state["saved_bonus_frequency"] = bonus_frequency
+        st.session_state["saved_increment_model"] = increment_model
+        st.session_state["saved_fiscal_start_month"] = fiscal_start_month
+        st.session_state["saved_start_month"] = start_month
+        st.session_state["saved_projection_months"] = projection_months
         st.rerun()
 
     if st.session_state.get("projection_done"):
@@ -800,7 +808,7 @@ with tab1:
                     st.error(f"Error reading file: {e}")
         else:
             st.session_state["df"] = sample_data()
-            st.info("Using sample dataset with 6 employees across 3 departments.")
+            st.info("Using sample dataset with 8 employees across 3 departments.")
 
     with col_info:
         st.markdown('<div class="section-header">Expected Format</div>', unsafe_allow_html=True)
@@ -876,24 +884,33 @@ Hire Date format: <code>YYYY-MM-DD</code> or <code>MM/DD/YYYY</code>
         st.markdown("---")
         triggered = st.button("Run Payroll Projection", key="main_run_btn") or st.session_state.pop("trigger_run", False)
         if triggered:
+            # Use saved sidebar params if triggered from sidebar button
+            _raise_pct = st.session_state.pop("saved_raise_pct", raise_pct)
+            _benefits_pct = st.session_state.pop("saved_benefits_pct", benefits_pct)
+            _payroll_tax_pct = st.session_state.pop("saved_payroll_tax_pct", payroll_tax_pct)
+            _bonus_frequency = st.session_state.pop("saved_bonus_frequency", bonus_frequency)
+            _increment_model = st.session_state.pop("saved_increment_model", increment_model)
+            _fiscal_start_month = st.session_state.pop("saved_fiscal_start_month", fiscal_start_month)
+            _start_month = st.session_state.pop("saved_start_month", start_month)
+            _projection_months = st.session_state.pop("saved_projection_months", projection_months)
             with st.spinner("Calculating projections..."):
                 try:
                     result_df = run_projection(
                         df=df,
-                        start_date=start_month,
-                        months=projection_months,
-                        raise_pct=raise_pct,
-                        benefits_pct=benefits_pct,
-                        payroll_tax_pct=payroll_tax_pct,
+                        start_date=_start_month,
+                        months=_projection_months,
+                        raise_pct=_raise_pct,
+                        benefits_pct=_benefits_pct,
+                        payroll_tax_pct=_payroll_tax_pct,
                         new_hires=st.session_state.get("new_hires", []),
                         terminations=st.session_state.get("terminations", []),
                         dept_budgets=st.session_state.get("dept_budgets", {}),
-                        bonus_frequency=bonus_frequency,
-                        increment_model=increment_model,
-                        fiscal_start_month=fiscal_start_month
+                        bonus_frequency=_bonus_frequency,
+                        increment_model=_increment_model,
+                        fiscal_start_month=_fiscal_start_month
                     )
                     st.session_state["result_df"] = result_df
-                    st.session_state["increment_model_used"] = increment_model
+                    st.session_state["increment_model_used"] = _increment_model
                     st.session_state["projection_done"] = True
                 except Exception as e:
                     st.error(f"Projection failed: {e}")
@@ -1126,7 +1143,7 @@ with tab4:
 
         # ── Section 1: Raise Sensitivity ──────────────────────────────
         st.markdown('<div class="section-header">What-If: Raise Sensitivity</div>', unsafe_allow_html=True)
-        st.markdown("Compare three raise scenarios side by side. All other parameters use sidebar values.")
+        st.markdown("Compare three raise scenarios side by side. All other parameters use sidebar values. Planned hires and terminations are excluded to isolate the raise impact.")
 
         c1, c2, c3 = st.columns(3)
         with c1:
