@@ -1,0 +1,35 @@
+dimension,value,year,revenue
+product,Analytics,2024,273589.0
+product,Core,2024,1853437.0
+product,DataPipeline,2024,190013.0
+product,Analytics,2023,138817.0
+product,Core,2023,971121.0
+product,DataPipeline,2023,115954.0
+product,TOTAL,2024,2317040.0
+product,TOTAL,2023,1225893.0
+customer_segment,Enterprise,2024,1145711.0
+customer_segment,Mid-Market,2024,758173.0
+customer_segment,SMB,2024,413156.0
+customer_segment,Enterprise,2023,486527.0
+customer_segment,Mid-Market,2023,416227.0
+customer_segment,SMB,2023,323138.0
+customer_segment,TOTAL,2024,2317040.0
+customer_segment,TOTAL,2023,1225893.0
+payment_terms,annual_quarterly,2024,432753.0
+payment_terms,annual_upfront,2024,1012617.0
+payment_terms,monthly,2024,871670.0
+payment_terms,annual_quarterly,2023,224548.0
+payment_terms,annual_upfront,2023,456056.0
+payment_terms,monthly,2023,545289.0
+payment_terms,TOTAL,2024,2317040.0
+payment_terms,TOTAL,2023,1225893.0
+region,APAC,2024,435199.0
+region,EMEA,2024,459836.0
+region,LATAM,2024,86693.0
+region,North America,2024,1335311.0
+region,APAC,2023,212454.0
+region,EMEA,2023,279143.0
+region,LATAM,2023,70518.0
+region,North America,2023,663777.0
+region,TOTAL,2024,2317040.0
+region,TOTAL,2023,1225893.0

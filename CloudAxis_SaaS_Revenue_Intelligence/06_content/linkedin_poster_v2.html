@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LinkedIn Poster — ASC 606 + AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #060608;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  .poster {
+    width: 1080px;
+    height: 1080px;
+    background: #060608;
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  /* Atmospheric background */
+  .bg-glow {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 70% 50% at 80% 15%, rgba(37,99,235,0.14) 0%, transparent 55%),
+      radial-gradient(ellipse 40% 35% at 15% 85%, rgba(16,185,129,0.07) 0%, transparent 50%),
+      radial-gradient(ellipse 60% 40% at 50% 50%, rgba(0,0,0,0) 0%, rgba(6,6,8,0.6) 100%);
+  }
+
+  /* Subtle horizontal scan lines */
+  .scanlines {
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 3px,
+      rgba(255,255,255,0.012) 3px,
+      rgba(255,255,255,0.012) 4px
+    );
+  }
+
+  /* Top border */
+  .top-border {
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, transparent 0%, #2563EB 20%, #10B981 50%, #2563EB 80%, transparent 100%);
+  }
+
+  /* Side accent */
+  .side-accent {
+    position: absolute;
+    left: 0; top: 80px; bottom: 80px; width: 2px;
+    background: linear-gradient(180deg, transparent, #2563EB 30%, #2563EB 70%, transparent);
+    opacity: 0.5;
+  }
+
+  .content {
+    position: relative;
+    z-index: 10;
+    padding: 56px 64px 52px 72px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Eyebrow */
+  .eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 40px;
+  }
+  .eyebrow-pip {
+    width: 6px; height: 6px;
+    background: #10B981;
+    border-radius: 50%;
+    box-shadow: 0 0 10px #10B981;
+  }
+  .eyebrow-text {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .2em;
+    color: #10B981;
+    text-transform: uppercase;
+  }
+
+  /* Big statement */
+  .main-statement {
+    margin-bottom: 32px;
+  }
+  .statement-line1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 72px;
+    line-height: 0.9;
+    color: #fff;
+    letter-spacing: .02em;
+    display: block;
+  }
+  .statement-line2 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 72px;
+    line-height: 0.9;
+    color: #2563EB;
+    letter-spacing: .02em;
+    display: block;
+  }
+  .statement-line3 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 44px;
+    line-height: 1.0;
+    color: #475569;
+    letter-spacing: .04em;
+    display: block;
+    margin-top: 6px;
+  }
+
+  /* Divider */
+  .h-rule {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 30px;
+  }
+  .h-rule-line { flex: 1; height: 1px; background: rgba(255,255,255,0.08); }
+  .h-rule-dot { width: 4px; height: 4px; background: #2563EB; border-radius: 50%; }
+
+  /* Two-column contrast grid */
+  .contrast-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px;
+    margin-bottom: 30px;
+    background: rgba(255,255,255,0.05);
+  }
+  .contrast-col {
+    padding: 18px 22px;
+  }
+  .contrast-col.left { background: rgba(6,6,8,0.95); border-left: 2px solid #2563EB; }
+  .contrast-col.right { background: rgba(6,6,8,0.95); border-left: 2px solid #10B981; }
+  .contrast-head {
+    font-family: 'DM Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .contrast-col.left  .contrast-head { color: #60A5FA; }
+  .contrast-col.right .contrast-head { color: #34D399; }
+  .contrast-items { list-style: none; }
+  .contrast-items li {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    color: #94A3B8;
+    padding: 3px 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    line-height: 1.35;
+  }
+  .contrast-items li::before { flex-shrink: 0; margin-top: 1px; }
+  .contrast-col.left  .contrast-items li::before { content: '↓'; color: #2563EB; font-size: 11px; }
+  .contrast-col.right .contrast-items li::before { content: '→'; color: #10B981; font-size: 11px; }
+
+  /* Stat bar */
+  .stat-bar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2px;
+    background: rgba(255,255,255,0.04);
+    margin-bottom: 28px;
+  }
+  .stat-item {
+    background: #060608;
+    padding: 14px 16px;
+    text-align: center;
+  }
+  .stat-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 36px;
+    line-height: 1;
+    color: #fff;
+    display: block;
+  }
+  .stat-num .unit { color: #2563EB; }
+  .stat-desc {
+    font-family: 'DM Mono', monospace;
+    font-size: 8px;
+    letter-spacing: .1em;
+    color: #475569;
+    text-transform: uppercase;
+    margin-top: 4px;
+    display: block;
+  }
+
+  /* Validation log strip */
+  .val-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    color: #475569;
+    margin-bottom: 12px;
+  }
+  .val-items {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 28px;
+  }
+  .val-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 10px 12px;
+    background: rgba(37,99,235,0.05);
+    border: 1px solid rgba(37,99,235,0.12);
+  }
+  .val-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    color: #2563EB;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .val-text {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px;
+    color: #64748B;
+    line-height: 1.4;
+  }
+  .val-text strong { display: block; color: #94A3B8; font-size: 11.5px; font-weight: 500; }
+
+  /* Bottom row */
+  .bottom-row {
+    margin-top: auto;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    padding-top: 22px;
+  }
+  .pull-quote {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.45;
+    color: #E2E8F0;
+    max-width: 520px;
+  }
+  .pull-quote em {
+    font-style: normal;
+    color: #60A5FA;
+  }
+  .author-block { text-align: right; }
+  .author-name {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: #E2E8F0;
+    letter-spacing: .06em;
+    display: block;
+    margin-bottom: 2px;
+  }
+  .author-role {
+    font-family: 'DM Mono', monospace;
+    font-size: 8.5px;
+    color: #334155;
+    letter-spacing: .04em;
+  }
+</style>
+</head>
+<body>
+<div class="poster">
+  <div class="bg-glow"></div>
+  <div class="scanlines"></div>
+  <div class="top-border"></div>
+  <div class="side-accent"></div>
+
+  <div class="content">
+
+    <div class="eyebrow">
+      <div class="eyebrow-pip"></div>
+      <span class="eyebrow-text">ASC 606 · Revenue Recognition · AI in Finance</span>
+    </div>
+
+    <div class="main-statement">
+      <span class="statement-line1">I SPENT MORE TIME</span>
+      <span class="statement-line2">REVIEWING AI'S WORK</span>
+      <span class="statement-line3">than building with it — and that was the point.</span>
+    </div>
+
+    <div class="h-rule">
+      <div class="h-rule-line"></div>
+      <div class="h-rule-dot"></div>
+      <div class="h-rule-line"></div>
+    </div>
+
+    <div class="contrast-grid">
+      <div class="contrast-col left">
+        <div class="contrast-head">What AI executed fast</div>
+        <ul class="contrast-items">
+          <li>Recognition engine (8-step loop)</li>
+          <li>9-tab Excel model with charts</li>
+          <li>Interactive dashboard, 5 pages</li>
+          <li>10-K disclosure package, 8 pages</li>
+        </ul>
+      </div>
+      <div class="contrast-col right">
+        <div class="contrast-head">What still needed a human</div>
+        <ul class="contrast-items">
+          <li>Modification: prospective vs catch-up</li>
+          <li>Renewal options as material rights</li>
+          <li>RPO exclusions & practical expedients</li>
+          <li>Churn methodology for defensible LTV</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="stat-bar">
+      <div class="stat-item">
+        <span class="stat-num">61<span class="unit"></span></span>
+        <span class="stat-desc">Contracts</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-num">948<span class="unit"></span></span>
+        <span class="stat-desc">Monthly rows</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-num">12<span class="unit"></span></span>
+        <span class="stat-desc">Checks pass</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-num">4<span class="unit"></span></span>
+        <span class="stat-desc">Bugs corrected</span>
+      </div>
+    </div>
+
+    <div class="val-title">From the validation log — errors found & fixed</div>
+    <div class="val-items">
+      <div class="val-item">
+        <span class="val-num">01</span>
+        <div class="val-text">
+          <strong>LTV:CAC showed 255×</strong>
+          Spot churn rate on lumpy data. Fixed with trailing 12-mo average + floor. Result: 12×.
+        </div>
+      </div>
+      <div class="val-item">
+        <span class="val-num">02</span>
+        <div class="val-text">
+          <strong>Deferred roll-forward didn't tie</strong>
+          Wrong columns: total billings ≠ additions to deferred. All 8 quarters off.
+        </div>
+      </div>
+      <div class="val-item">
+        <span class="val-num">03</span>
+        <div class="val-text">
+          <strong>Commission table missing write-offs</strong>
+          Early terminations create write-offs (ASC 340-40-35-1). Not in disclosure.
+        </div>
+      </div>
+      <div class="val-item">
+        <span class="val-num">04</span>
+        <div class="val-text">
+          <strong>Billing guard on DataPipeline</strong>
+          Annual upfront guard zeroed monthly usage billing incorrectly. Removed.
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom-row">
+      <div class="pull-quote">
+        AI that gets the modification treatment wrong<br>
+        will get it wrong <em>948 times</em>. Consistently.<br>
+        Without flagging it.
+      </div>
+      <div class="author-block">
+        <span class="author-name">PUSHKAR AGRAWAL</span>
+        <span class="author-role">ACCOUNTING PROFESSIONAL · REVENUE RECOGNITION</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CloudAxis Revenue Intelligence</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --ink:#0D1117;--ink2:#3D4451;--ink3:#6B7280;
+    --surface:#FFFFFF;--bg:#F6F8FA;--border:#E2E8F0;
+    --blue:#2563EB;--blue-light:#EFF6FF;
+    --green:#059669;--green-light:#ECFDF5;
+    --red:#DC2626;--red-light:#FEF2F2;
+    --amber:#D97706;--amber-light:#FFFBEB;
+    --purple:#7C3AED;--purple-light:#F5F3FF;
+  }
+  body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--ink);font-size:13px;line-height:1.5}
+  
+  /* ── Header ─── */
+  .header{background:var(--ink);padding:20px 32px;display:flex;align-items:center;justify-content:space-between}
+  .header-left h1{font-size:16px;font-weight:600;color:#fff;letter-spacing:-.3px}
+  .header-left p{font-size:11px;color:#6B7280;margin-top:2px;font-family:'IBM Plex Mono',monospace}
+  .header-right{font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6B7280}
+  .badge{display:inline-block;background:#1F2937;color:#9CA3AF;padding:3px 8px;border-radius:4px;font-size:10px;margin-left:6px}
+
+  /* ── Navigation tabs ─── */
+  .tabs{background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;display:flex;gap:0}
+  .tab{padding:12px 18px;font-size:12px;font-weight:500;color:var(--ink3);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap}
+  .tab:hover{color:var(--ink)}
+  .tab.active{color:var(--blue);border-bottom-color:var(--blue)}
+
+  /* ── Layout ─── */
+  .page{display:none;padding:24px 32px}
+  .page.active{display:block}
+  .kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 18px}
+  .card-title{font-size:10px;font-weight:500;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+  .kpi-val{font-size:22px;font-weight:600;color:var(--ink);font-family:'IBM Plex Mono',monospace}
+  .kpi-sub{font-size:11px;color:var(--ink3);margin-top:3px}
+  .kpi-delta{font-size:11px;font-weight:500;margin-top:3px}
+  .kpi-delta.up{color:var(--green)}
+  .kpi-delta.down{color:var(--red)}
+  .kpi-delta.neutral{color:var(--ink3)}
+
+  /* ── Charts ─── */
+  .chart-grid{display:grid;gap:16px}
+  .chart-grid.two{grid-template-columns:1fr 1fr}
+  .chart-grid.three{grid-template-columns:1fr 1fr 1fr}
+  .chart-grid.wide-narrow{grid-template-columns:2fr 1fr}
+  .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:18px}
+  .chart-card h3{font-size:12px;font-weight:600;color:var(--ink);margin-bottom:4px}
+  .chart-card p{font-size:11px;color:var(--ink3);margin-bottom:14px}
+  .chart-wrap{position:relative}
+  canvas{max-height:260px}
+
+  /* ── Tables ─── */
+  table{width:100%;border-collapse:collapse;font-size:11px}
+  th{background:var(--bg);color:var(--ink3);font-weight:500;padding:7px 10px;text-align:right;border-bottom:1px solid var(--border);font-size:10px;text-transform:uppercase;letter-spacing:.04em}
+  th:first-child{text-align:left}
+  td{padding:6px 10px;text-align:right;border-bottom:1px solid var(--border);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:11px}
+  td:first-child{text-align:left;font-family:'IBM Plex Sans',monospace;color:var(--ink2)}
+  tr:hover td{background:#FAFBFC}
+
+  /* ── Cohort heatmap ─── */
+  .heatmap-wrap{overflow-x:auto}
+  .heatmap{border-collapse:collapse;font-size:10px}
+  .heatmap th{padding:5px 8px;font-size:9px;background:var(--bg);color:var(--ink3);border:1px solid var(--border);text-align:center;white-space:nowrap}
+  .heatmap td{padding:5px 8px;text-align:center;border:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-size:10px;min-width:44px}
+  .hm-100{background:#059669;color:#fff}
+  .hm-90{background:#34D399;color:#065F46}
+  .hm-80{background:#A7F3D0;color:#065F46}
+  .hm-70{background:#FCD34D;color:#78350F}
+  .hm-60{background:#FCA5A5;color:#7F1D1D}
+  .hm-50{background:#F87171;color:#fff}
+  .hm-low{background:#DC2626;color:#fff}
+  .hm-na{background:var(--bg);color:var(--ink3)}
+
+  /* ── Segments ─── */
+  .seg-pills{display:flex;gap:6px;margin-bottom:14px}
+  .seg-pill{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--ink3)}
+  .seg-pill.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+  /* ── Section label ─── */
+  .section-label{font-size:10px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .section-label::after{content:'';flex:1;height:1px;background:var(--border)}
+
+  /* ── Annotation note ─── */
+  .note{background:var(--blue-light);border-left:3px solid var(--blue);padding:8px 12px;border-radius:0 4px 4px 0;font-size:11px;color:#1E40AF;margin-bottom:14px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>CloudAxis Inc. — Revenue Intelligence</h1>
+    <p>ASC 606 · 50 Customers · 24 Months (2023-01 → 2024-12)<span class="badge">Phase 3</span></p>
+  </div>
+  <div class="header-right">Built by Pushkar Agrawal · CA · Resonant Energy</div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showPage('mrr')">MRR Waterfall</div>
+  <div class="tab" onclick="showPage('retention')">NRR & GRR</div>
+  <div class="tab" onclick="showPage('cohort')">Cohort Retention</div>
+  <div class="tab" onclick="showPage('ltvcac')">LTV : CAC</div>
+  <div class="tab" onclick="showPage('asc606')">ASC 606 Disclosures</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ PAGE 1: MRR -->
+<div class="page active" id="page-mrr">
+  <div class="kpi-row" id="kpi-mrr"></div>
+  <div class="chart-grid two" style="margin-bottom:16px">
+    <div class="chart-card">
+      <h3>Monthly MRR Movement</h3>
+      <p>New · Expansion · Contraction · Churn stacked by month</p>
+      <div class="chart-wrap"><canvas id="c-mrr-stacked"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>ARR Trend</h3>
+      <p>Annualised run-rate revenue trajectory</p>
+      <div class="chart-wrap"><canvas id="c-arr"></canvas></div>
+    </div>
+  </div>
+  <div class="section-label">Monthly Detail</div>
+  <div class="card"><table id="t-mrr"></table></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ PAGE 2: RETENTION -->
+<div class="page" id="page-retention">
+  <div class="kpi-row" id="kpi-nrr"></div>
+  <div class="note">NRR measures revenue growth from existing customers including expansion. GRR excludes expansion — it shows the floor. NRR &gt; 100% means the business grows even with churn.</div>
+  <div class="chart-grid two" style="margin-bottom:16px">
+    <div class="chart-card">
+      <h3>NRR vs GRR — Rolling 12-Month</h3>
+      <p>Based on customers active 12 months prior</p>
+      <div class="chart-wrap"><canvas id="c-nrr"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>MRR Bridge: Start → End of Period</h3>
+      <p>How MRR components change month over month</p>
+      <div class="chart-wrap"><canvas id="c-net-new"></canvas></div>
+    </div>
+  </div>
+  <div class="section-label">NRR / GRR Detail</div>
+  <div class="card"><table id="t-nrr"></table></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ PAGE 3: COHORT -->
+<div class="page" id="page-cohort">
+  <div class="note">Each row is a cohort of customers who first paid in that month. Values show % of original cohort MRR still active. Green = retained/expanded. Red = contracted/churned.</div>
+  <div class="chart-card" style="margin-bottom:16px">
+    <h3>Cohort MRR Retention Heatmap</h3>
+    <p>Row = cohort · Column = months since first payment</p>
+    <div class="heatmap-wrap" id="cohort-heatmap"></div>
+  </div>
+  <div class="chart-card">
+    <h3>Cohort Retention Curves</h3>
+    <p>Select cohorts to compare retention trajectories</p>
+    <div class="chart-wrap"><canvas id="c-cohort-lines" style="max-height:240px"></canvas></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ PAGE 4: LTV:CAC -->
+<div class="page" id="page-ltvcac">
+  <div class="seg-pills">
+    <div class="seg-pill active" onclick="filterSeg(this,'All')">All Segments</div>
+    <div class="seg-pill" onclick="filterSeg(this,'SMB')">SMB</div>
+    <div class="seg-pill" onclick="filterSeg(this,'Mid-Market')">Mid-Market</div>
+    <div class="seg-pill" onclick="filterSeg(this,'Enterprise')">Enterprise</div>
+  </div>
+  <div class="kpi-row" id="kpi-ltv"></div>
+  <div class="chart-grid two" style="margin-bottom:16px">
+    <div class="chart-card">
+      <h3>LTV : CAC Ratio by Segment</h3>
+      <p>Target ≥ 3× for sustainable unit economics</p>
+      <div class="chart-wrap"><canvas id="c-ltvcac"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Payback Period (months)</h3>
+      <p>How long to recover customer acquisition cost</p>
+      <div class="chart-wrap"><canvas id="c-payback"></canvas></div>
+    </div>
+  </div>
+  <div class="section-label">Detail Table</div>
+  <div class="card"><table id="t-ltv"></table></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ PAGE 5: ASC 606 -->
+<div class="page" id="page-asc606">
+  <div class="kpi-row" id="kpi-asc606"></div>
+  <div class="chart-grid two" style="margin-bottom:16px">
+    <div class="chart-card">
+      <h3>Billings vs Revenue Recognised</h3>
+      <p>Gap = change in deferred revenue + contract asset</p>
+      <div class="chart-wrap"><canvas id="c-billings"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Deferred Revenue Balance</h3>
+      <p>Contract liability — billed but not yet earned</p>
+      <div class="chart-wrap"><canvas id="c-deferred"></canvas></div>
+    </div>
+  </div>
+  <div class="chart-grid two">
+    <div class="chart-card">
+      <h3>RPO by Product</h3>
+      <p>Remaining performance obligations — committed contracts only</p>
+      <div class="chart-wrap"><canvas id="c-rpo"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Commission Asset (ASC 340-40)</h3>
+      <p>Capitalised sales commissions amortising over customer life</p>
+      <div class="chart-wrap"><canvas id="c-comm"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Embedded data (loaded from metrics CSVs) ──────────────────────────────
+const RAW = {"mrr":[{"period_month":"2023-01","new_mrr":16397.63,"expansion_mrr":0.0,"contraction_mrr":0.0,"churned_mrr":0.0,"reactivation_mrr":0.0,"net_new_mrr":16397.63,"total_mrr":16397.63,"arr":196771.56,"active_customers":4,"growth_from_baseline_pct":-77.0,"baseline_period":"2023-04"},{"period_month":"2023-02","new_mrr":10212.37,"expansion_mrr":0.0,"contraction_mrr":0.0,"churned_mrr":0.0,"reactivation_mrr":0.0,"net_new_mrr":10212.37,"total_mrr":26610.0,"arr":319320.0,"active_customers":6,"growth_from_baseline_pct":-62.7,"baseline_period":"2023-04"},{"period_month":"2023-03","new_mrr":13705.27,"expansion_mrr":0.0,"contraction_mrr":0.0,"churned_mrr":0.0,"reactivation_mrr":0.0,"net_new_mrr":13705.27,"total_mrr":40447.96,"arr":485375.52,"active_customers":10,"growth_from_baseline_pct":-43.3,"baseline_period":"2023-04"},{"period_month":"2023-04","new_mrr":31028.77,"expansion_mrr":0.0,"contraction_mrr":0.0,"churned_mrr":644.14,"reactivation_mrr":0.0,"net_new_mrr":30384.63,"total_mrr":71373.92,"arr":856487.04,"active_customers":16,"growth_from_baseline_pct":0.0,"baseline_period":"2023-04"},{"period_month":"2023-05","new_mrr":6346.31,"expansion_mrr":515.7,"contraction_mrr":0.0,"churned_mrr":0.0,"reactivation_mrr":0.0,"net_new_mrr":6862.01,"total_mrr":77621.57,"arr":931458.84,"active_customers":17,"growth_from_baseline_pct":8.8,"baseline_period":"2023-04"},{"period_month":"2023-06","new_mrr":40049.68,"expansion_mrr":0.0,"contraction_mrr":0.0,"churned_mrr":0.0,"reactivation_mrr":0.0,"net_new_mrr":40049.68,"total_mrr":117650.87,"arr":1411810.44,"active_customers":24,"growth_from_baseline_pct":64.8,"baseline_period":"2023-04"},{"period_month":"2023-07","new_mrr":7907.27,"expansion_mrr":0.0,"contraction_mrr":0.0,"churned_mrr":0.0,"reactivation_mrr":0.0,"net_new_mrr":7907.27,"total_mrr":125842.29,"arr":1510107.48,"active_customers":26,"growth_from_baseline_pct":76.3,"baseline_period":"2023-04"},{"period_month":"2023-08","new_mrr":17641.51,"expansion_mrr":5523.95,"contraction_mrr":0.0,"churned_mrr":0.0,"reactivation_mrr":0.0,"net_new_mrr":23165.46,"total_mrr":149023.45,"arr":1788281.4,"active_customers":31,"growth_from_baseline_pct":108.8,"baseline_period":"2023-04"},{"period_month":"2023-09","new_mrr":2773.2,"expansion_mrr":0.0,"contraction_mrr":0.0,"churned_mrr":0.0,"reactivation_mrr":0.0,"net_new_mrr":2773.2,"total_mrr":150099.05,"arr":1801188.6,"active_customers":33,"growth_from_baseline_pct":110.3,"baseline_period":"2023-04"},{"period_month":"2023-10","new_mrr":7015.96,"expansion_mrr":3304.97,"contraction_mrr":142.12,"churned_mrr":0.0,"reactivation_mrr":0.0,"net_new_mrr":10178.81,"total_mrr":160918.35,"arr":1931020.2,"active_customers":35,"growth_from_baseline_pct":125.5,"baseline_period":"2023-04"},{"period_month":"2023-11","new_mrr":9856.44,"expansion_mrr":2438.62,"contraction_mrr":0.0,"churned_mrr":0.0,"reactivation_mrr":0.0,"net_new_mrr":12295.06,"total_mrr":173378.06,"arr":2080536.72,"active_customers":37,"growth_from_baseline_pct":142.9,"baseline_period":"2023-04"},{"period_month":"2023-12","new_mrr":2948.71,"expansion_mrr":0.0,"contraction_mrr":0.0,"churned_mrr":5714.46,"reactivation_mrr":0.0,"net_new_mrr":-2765.75,"total_mrr":177568.37,"arr":2130820.44,"active_customers":39,"growth_from_baseline_pct":148.8,"baseline_period":"2023-04"},{"period_month":"2024-01","new_mrr":17217.7,"expansion_mrr":1034.14,"contraction_mrr":0.0,"churned_mrr":0.0,"reactivation_mrr":0.0,"net_new_mrr":18251.84,"total_mrr":189599.91,"arr":2275198.92,"active_customers":40,"growth_from_baseline_pct":165.6,"baseline_period":"2023-04"},{"period_month":"2024-02","new_mrr":20290.47,"expansion_mrr":0.0,"contraction_mrr":0.0,"churned_mrr":5595.93,"reactivation_mrr":0.0,"net_new_mrr":14694.54,"total_mrr":210163.63,"arr":2521963.56,"active_customers":43,"growth_from_baseline_pct":194.5,"baseline_period":"2023-04"},{"period_month":"2024-03","new_mrr":4197.25,"expansion_mrr":1353.19,"contraction_mrr":152.77,"churned_mrr":0.0,"reactivation_mrr":0.0,"net_new_mrr":5397.67,"total_mrr":208914.11,"arr":2506969.32,"active_customers":44,"growth_from_baseline_pct":192.7,"baseline_period":"2023-04"},{"period_month":"2024-04","new_mrr":4177.05,"expansion_mrr":445.31,"contraction_mrr":0.0,"churned_mrr":2912.53,"reactivation_mrr":2458.08,"net_new_mrr":4167.91,"total_mrr":214468.17,"arr":2573618.04,"active_customers":46,"growth_from_baseline_pct":200.5,"baseline_period":"2023-04"},{"period_month":"2024-05","new_mrr":13347.91,"expansion_mrr":0.0,"contraction_mrr":1358.13,"churned_mrr":13410.93,"reactivation_mrr":0.0,"net_new_mrr":-1421.15,"total_mrr":225351.86,"arr":2704222.32,"active_customers":47,"growth_from_baseline_pct":215.7,"baseline_period":"2023-04"},{"period_month":"2024-06","new_mrr":0.0,"expansion_mrr":728.04,"contraction_mrr":0.0,"churned_mrr":12540.42,"reactivation_mrr":0.0,"net_new_mrr":-11812.38,"total_mrr":211835.04,"arr":2542020.48,"active_customers":46,"growth_from_baseline_pct":196.8,"baseline_period":"2023-04"},{"period_month":"2024-07","new_mrr":0.0,"expansion_mrr":1551.44,"contraction_mrr":0.0,"churned_mrr":0.0,"reactivation_mrr":0.0,"net_new_mrr":1551.44,"total_mrr":201264.92,"arr":2415179.04,"active_customers":43,"growth_from_baseline_pct":182.0,"baseline_period":"2023-04"},{"period_month":"2024-08","new_mrr":0.0,"expansion_mrr":0.0,"contraction_mrr":0.0,"churned_mrr":1251.36,"reactivation_mrr":0.0,"net_new_mrr":-1251.36,"total_mrr":201071.14,"arr":2412853.68,"active_customers":43,"growth_from_baseline_pct":181.7,"baseline_period":"2023-04"},{"period_month":"2024-09","new_mrr":0.0,"expansion_mrr":0.0,"contraction_mrr":0.0,"churned_mrr":2124.99,"reactivation_mrr":0.0,"net_new_mrr":-2124.99,"total_mrr":199149.42,"arr":2389793.04,"active_customers":42,"growth_from_baseline_pct":179.0,"baseline_period":"2023-04"},{"period_month":"2024-10","new_mrr":0.0,"expansion_mrr":0.0,"contraction_mrr":0.0,"churned_mrr":0.0,"reactivation_mrr":0.0,"net_new_mrr":0.0,"total_mrr":198581.08,"arr":2382972.96,"active_customers":41,"growth_from_baseline_pct":178.2,"baseline_period":"2023-04"},{"period_month":"2024-11","new_mrr":0.0,"expansion_mrr":0.0,"contraction_mrr":478.94,"churned_mrr":0.0,"reactivation_mrr":0.0,"net_new_mrr":-478.94,"total_mrr":196905.01,"arr":2362860.12,"active_customers":41,"growth_from_baseline_pct":175.9,"baseline_period":"2023-04"},{"period_month":"2024-12","new_mrr":0.0,"expansion_mrr":0.0,"contraction_mrr":0.0,"churned_mrr":0.0,"reactivation_mrr":0.0,"net_new_mrr":0.0,"total_mrr":197087.7,"arr":2365052.4,"active_customers":41,"growth_from_baseline_pct":176.1,"baseline_period":"2023-04"}],"nrr":[{"period_month":"2024-01","base_period":"2023-01","starting_mrr":16397.63,"ending_mrr":16342.34,"nrr_pct":99.7,"grr_pct":96.5},{"period_month":"2024-02","base_period":"2023-02","starting_mrr":26610.0,"ending_mrr":26568.76,"nrr_pct":99.8,"grr_pct":97.9},{"period_month":"2024-03","base_period":"2023-03","starting_mrr":40447.96,"ending_mrr":40675.31,"nrr_pct":100.6,"grr_pct":98.2},{"period_month":"2024-04","base_period":"2023-04","starting_mrr":71373.92,"ending_mrr":76769.43,"nrr_pct":107.6,"grr_pct":99.1},{"period_month":"2024-05","base_period":"2023-05","starting_mrr":77621.57,"ending_mrr":77603.55,"nrr_pct":100.0,"grr_pct":92.6},{"period_month":"2024-06","base_period":"2023-06","starting_mrr":117650.87,"ending_mrr":122107.89,"nrr_pct":103.8,"grr_pct":95.0},{"period_month":"2024-07","base_period":"2023-07","starting_mrr":125842.29,"ending_mrr":118170.99,"nrr_pct":93.9,"grr_pct":85.2},{"period_month":"2024-08","base_period":"2023-08","starting_mrr":149023.45,"ending_mrr":130858.86,"nrr_pct":87.8,"grr_pct":83.8},{"period_month":"2024-09","base_period":"2023-09","starting_mrr":150099.05,"ending_mrr":132552.41,"nrr_pct":88.3,"grr_pct":84.3},{"period_month":"2024-10","base_period":"2023-10","starting_mrr":160918.35,"ending_mrr":138994.06,"nrr_pct":86.4,"grr_pct":84.1},{"period_month":"2024-11","base_period":"2023-11","starting_mrr":173378.06,"ending_mrr":148081.66,"nrr_pct":85.4,"grr_pct":83.7},{"period_month":"2024-12","base_period":"2023-12","starting_mrr":177568.37,"ending_mrr":148393.95,"nrr_pct":83.6,"grr_pct":82.1}],"bil":[{"period_month":"2023-01","billings":64919.07,"revenue_recognized":17809.91,"impl_fee_portion":1412.28,"billings_vs_revenue":47109.16,"deferred_balance":47109.16,"contract_asset":0.0},{"period_month":"2023-02","billings":39814.96,"revenue_recognized":28022.28,"impl_fee_portion":1412.28,"billings_vs_revenue":11792.68,"deferred_balance":58901.84,"contract_asset":0.0},{"period_month":"2023-03","billings":64596.55,"revenue_recognized":39948.37,"impl_fee_portion":3488.13,"billings_vs_revenue":24648.18,"deferred_balance":64311.36,"contract_asset":0.0},{"period_month":"2023-04","billings":225397.29,"revenue_recognized":66617.1,"impl_fee_portion":4064.48,"billings_vs_revenue":158780.19,"deferred_balance":198055.45,"contract_asset":0.0},{"period_month":"2023-05","billings":61099.29,"revenue_recognized":71312.07,"impl_fee_portion":4064.48,"billings_vs_revenue":-10212.78,"deferred_balance":186511.4,"contract_asset":0.0},{"period_month":"2023-06","billings":342688.91,"revenue_recognized":112040.62,"impl_fee_portion":4763.73,"billings_vs_revenue":230648.29,"deferred_balance":416843.09,"contract_asset":1014.67},{"period_month":"2023-07","billings":92337.06,"revenue_recognized":120232.04,"impl_fee_portion":4763.73,"billings_vs_revenue":-27894.98,"deferred_balance":371035.39,"contract_asset":606.59},{"period_month":"2023-08","billings":131034.43,"revenue_recognized":142775.92,"impl_fee_portion":6481.81,"billings_vs_revenue":-11741.49,"deferred_balance":359926.89,"contract_asset":3800.89},{"period_month":"2023-09","billings":103463.51,"revenue_recognized":143851.52,"impl_fee_portion":6481.81,"billings_vs_revenue":-40388.01,"deferred_balance":325220.59,"contract_asset":12043.91},{"period_month":"2023-10","billings":188739.29,"revenue_recognized":152582.85,"impl_fee_portion":6481.81,"billings_vs_revenue":36156.44,"deferred_balance":317844.2,"contract_asset":15490.21},{"period_month":"2023-11","billings":178503.93,"revenue_recognized":163473.98,"impl_fee_portion":6481.81,"billings_vs_revenue":15029.95,"deferred_balance":335065.91,"contract_asset":24949.03},{"period_month":"2023-12","billings":119312.66,"revenue_recognized":167225.92,"impl_fee_portion":6833.85,"billings_vs_revenue":-47913.26,"deferred_balance":289746.11,"contract_asset":39588.83},{"period_month":"2024-01","billings":212108.74,"revenue_recognized":179257.46,"impl_fee_portion":6833.85,"billings_vs_revenue":32851.28,"deferred_balance":304662.26,"contract_asset":43577.22},{"period_month":"2024-02","billings":357009.23,"revenue_recognized":200688.45,"impl_fee_portion":8028.26,"billings_vs_revenue":156320.78,"deferred_balance":453431.5,"contract_asset":57978.08},{"period_month":"2024-03","billings":81928.1,"revenue_recognized":199496.75,"impl_fee_portion":8028.26,"billings_vs_revenue":-117568.65,"deferred_balance":363877.45,"contract_asset":88084.18},{"period_month":"2024-04","billings":183700.84,"revenue_recognized":205734.22,"impl_fee_portion":8375.72,"billings_vs_revenue":-22033.38,"deferred_balance":341481.7,"contract_asset":111062.63},{"period_month":"2024-05","billings":135853.18,"revenue_recognized":219320.37,"impl_fee_portion":8375.72,"billings_vs_revenue":-83467.19,"deferred_balance":282134.94,"contract_asset":156283.22},{"period_month":"2024-06","billings":99352.35,"revenue_recognized":199454.42,"impl_fee_portion":8375.72,"billings_vs_revenue":-100102.07,"deferred_balance":234429.06,"contract_asset":213782.81},{"period_month":"2024-07","billings":129747.68,"revenue_recognized":188884.3,"impl_fee_portion":8375.72,"billings_vs_revenue":-59136.62,"deferred_balance":187483.68,"contract_asset":238807.76},{"period_month":"2024-08","billings":132013.39,"revenue_recognized":193641.96,"impl_fee_portion":8375.72,"billings_vs_revenue":-61628.57,"deferred_balance":166578.6,"contract_asset":286623.38},{"period_month":"2024-09","billings":99964.17,"revenue_recognized":186416.76,"impl_fee_portion":8023.68,"billings_vs_revenue":-86452.59,"deferred_balance":122995.66,"contract_asset":334596.43},{"period_month":"2024-10","billings":130440.19,"revenue_recognized":185848.42,"impl_fee_portion":8023.68,"billings_vs_revenue":-55408.23,"deferred_balance":82536.42,"contract_asset":371886.04},{"period_month":"2024-11","billings":131223.61,"revenue_recognized":184591.03,"impl_fee_portion":8023.68,"billings_vs_revenue":-53367.42,"deferred_balance":70623.84,"contract_asset":424380.05},{"period_month":"2024-12","billings":100027.44,"revenue_recognized":184773.72,"impl_fee_portion":8023.68,"billings_vs_revenue":-84746.28,"deferred_balance":30649.89,"contract_asset":473837.1}],"rpo":[{"period_month":"2023-01","product":"Core","rpo_total":105864.96},{"period_month":"2023-01","product":"Analytics","rpo_total":0.0},{"period_month":"2023-01","product":"DataPipeline","rpo_total":0.0},{"period_month":"2023-02","product":"Core","rpo_total":312845.92},{"period_month":"2023-02","product":"Analytics","rpo_total":0.0},{"period_month":"2023-02","product":"DataPipeline","rpo_total":32666.4},{"period_month":"2023-03","product":"Core","rpo_total":313175.84},{"period_month":"2023-03","product":"Analytics","rpo_total":70528.08},{"period_month":"2023-03","product":"DataPipeline","rpo_total":31305.3},{"period_month":"2023-04","product":"Core","rpo_total":679195.14},{"period_month":"2023-04","product":"Analytics","rpo_total":133793.41},{"period_month":"2023-04","product":"DataPipeline","rpo_total":29944.2},{"period_month":"2023-05","product":"Core","rpo_total":649586.44},{"period_month":"2023-05","product":"Analytics","rpo_total":128096.24},{"period_month":"2023-05","product":"DataPipeline","rpo_total":28583.1},{"period_month":"2023-06","product":"Core","rpo_total":1074208.22},{"period_month":"2023-06","product":"Analytics","rpo_total":137364.99},{"period_month":"2023-06","product":"DataPipeline","rpo_total":68354.4},{"period_month":"2023-07","product":"Core","rpo_total":1022017.28},{"period_month":"2023-07","product":"Analytics","rpo_total":130420.66},{"period_month":"2023-07","product":"DataPipeline","rpo_total":63565.6},{"period_month":"2023-08","product":"Core","rpo_total":1074450.1},{"period_month":"2023-08","product":"Analytics","rpo_total":146017.01},{"period_month":"2023-08","product":"DataPipeline","rpo_total":58776.8},{"period_month":"2023-09","product":"Core","rpo_total":1016167.2},{"period_month":"2023-09","product":"Analytics","rpo_total":162694.17},{"period_month":"2023-09","product":"DataPipeline","rpo_total":53988.0},{"period_month":"2023-10","product":"Core","rpo_total":1094404.7},{"period_month":"2023-10","product":"Analytics","rpo_total":159489.82},{"period_month":"2023-10","product":"DataPipeline","rpo_total":49199.2},{"period_month":"2023-11","product":"Core","rpo_total":1118306.45},{"period_month":"2023-11","product":"Analytics","rpo_total":261727.21},{"period_month":"2023-11","product":"DataPipeline","rpo_total":44410.4},{"period_month":"2023-12","product":"Core","rpo_total":1073574.84},{"period_month":"2023-12","product":"Analytics","rpo_total":251001.22},{"period_month":"2023-12","product":"DataPipeline","rpo_total":39621.6},{"period_month":"2024-01","product":"Core","rpo_total":1210401.77},{"period_month":"2024-01","product":"Analytics","rpo_total":241737.21},{"period_month":"2024-01","product":"DataPipeline","rpo_total":34832.8},{"period_month":"2024-02","product":"Core","rpo_total":1352073.96},{"period_month":"2024-02","product":"Analytics","rpo_total":228653.88},{"period_month":"2024-02","product":"DataPipeline","rpo_total":30044.0},{"period_month":"2024-03","product":"Core","rpo_total":1273585.3},{"period_month":"2024-03","product":"Analytics","rpo_total":212482.85},{"period_month":"2024-03","product":"DataPipeline","rpo_total":47122.08},{"period_month":"2024-04","product":"Core","rpo_total":1196560.07},{"period_month":"2024-04","product":"Analytics","rpo_total":216293.98},{"period_month":"2024-04","product":"DataPipeline","rpo_total":60159.84},{"period_month":"2024-05","product":"Core","rpo_total":1087579.8},{"period_month":"2024-05","product":"Analytics","rpo_total":163382.7},{"period_month":"2024-05","product":"DataPipeline","rpo_total":51911.4},{"period_month":"2024-06","product":"Core","rpo_total":891088.55},{"period_month":"2024-06","product":"Analytics","rpo_total":147926.01},{"period_month":"2024-06","product":"DataPipeline","rpo_total":43662.96},{"period_month":"2024-07","product":"Core","rpo_total":814481.54},{"period_month":"2024-07","product":"Analytics","rpo_total":134100.58},{"period_month":"2024-07","product":"DataPipeline","rpo_total":38842.22},{"period_month":"2024-08","product":"Core","rpo_total":723911.57},{"period_month":"2024-08","product":"Analytics","rpo_total":120275.15},{"period_month":"2024-08","product":"DataPipeline","rpo_total":34021.48},{"period_month":"2024-09","product":"Core","rpo_total":629587.52},{"period_month":"2024-09","product":"Analytics","rpo_total":106449.72},{"period_month":"2024-09","product":"DataPipeline","rpo_total":29200.74},{"period_month":"2024-10","product":"Core","rpo_total":540268.91},{"period_month":"2024-10","product":"Analytics","rpo_total":94749.28},{"period_month":"2024-10","product":"DataPipeline","rpo_total":24380.0},{"period_month":"2024-11","product":"Core","rpo_total":450950.3},{"period_month":"2024-11","product":"Analytics","rpo_total":83048.84},{"period_month":"2024-11","product":"DataPipeline","rpo_total":19559.26},{"period_month":"2024-12","product":"Core","rpo_total":361631.69},{"period_month":"2024-12","product":"Analytics","rpo_total":71348.4},{"period_month":"2024-12","product":"DataPipeline","rpo_total":14738.52}],"ltv":[{"period_month":"2023-01","segment":"SMB","active_customers":4,"avg_mrr":4099.41,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":177094.0,"cac":19192.0,"ltv_cac_ratio":9.2,"payback_months":6.5},{"period_month":"2023-02","segment":"SMB","active_customers":5,"avg_mrr":3560.4,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":153809.0,"cac":4667.0,"ltv_cac_ratio":33.0,"payback_months":1.8},{"period_month":"2023-02","segment":"Enterprise","active_customers":1,"avg_mrr":8808.0,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":380506.0,"cac":45298.0,"ltv_cac_ratio":8.4,"payback_months":7.1},{"period_month":"2023-03","segment":"SMB","active_customers":6,"avg_mrr":3083.36,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":133201.0,"cac":2908.0,"ltv_cac_ratio":45.8,"payback_months":1.3},{"period_month":"2023-03","segment":"Mid-Market","active_customers":2,"avg_mrr":5048.97,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":218116.0,"cac":37527.0,"ltv_cac_ratio":5.8,"payback_months":10.3},{"period_month":"2023-03","segment":"Enterprise","active_customers":2,"avg_mrr":5924.92,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":255957.0,"cac":15644.0,"ltv_cac_ratio":16.4,"payback_months":3.7},{"period_month":"2023-04","segment":"SMB","active_customers":9,"avg_mrr":2523.05,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":108996.0,"cac":5316.0,"ltv_cac_ratio":20.5,"payback_months":2.9},{"period_month":"2023-04","segment":"Mid-Market","active_customers":3,"avg_mrr":6704.16,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":289620.0,"cac":41203.0,"ltv_cac_ratio":7.0,"payback_months":8.5},{"period_month":"2023-04","segment":"Enterprise","active_customers":4,"avg_mrr":7138.5,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":308383.0,"cac":71825.0,"ltv_cac_ratio":4.3,"payback_months":14.0},{"period_month":"2023-05","segment":"SMB","active_customers":9,"avg_mrr":2582.29,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":111555.0,"cac":3250.0,"ltv_cac_ratio":34.3,"payback_months":1.7},{"period_month":"2023-05","segment":"Mid-Market","active_customers":4,"avg_mrr":6456.74,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":278931.0,"cac":47022.0,"ltv_cac_ratio":5.9,"payback_months":10.1},{"period_month":"2023-05","segment":"Enterprise","active_customers":4,"avg_mrr":7138.5,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":308383.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2023-06","segment":"SMB","active_customers":10,"avg_mrr":2363.25,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":102092.0,"cac":2120.0,"ltv_cac_ratio":48.2,"payback_months":1.2},{"period_month":"2023-06","segment":"Mid-Market","active_customers":6,"avg_mrr":5731.01,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":247580.0,"cac":17607.0,"ltv_cac_ratio":14.1,"payback_months":4.3},{"period_month":"2023-06","segment":"Enterprise","active_customers":8,"avg_mrr":7454.04,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":322015.0,"cac":71793.0,"ltv_cac_ratio":4.5,"payback_months":13.4},{"period_month":"2023-07","segment":"SMB","active_customers":10,"avg_mrr":2362.31,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":102052.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2023-07","segment":"Mid-Market","active_customers":8,"avg_mrr":5286.66,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":228384.0,"cac":30608.0,"ltv_cac_ratio":7.5,"payback_months":8.0},{"period_month":"2023-07","segment":"Enterprise","active_customers":8,"avg_mrr":7490.74,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":323600.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2023-08","segment":"SMB","active_customers":13,"avg_mrr":2520.87,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":108902.0,"cac":11657.0,"ltv_cac_ratio":9.3,"payback_months":6.4},{"period_month":"2023-08","segment":"Mid-Market","active_customers":10,"avg_mrr":5344.66,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":230889.0,"cac":33452.0,"ltv_cac_ratio":6.9,"payback_months":8.7},{"period_month":"2023-08","segment":"Enterprise","active_customers":8,"avg_mrr":7850.69,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":339150.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2023-09","segment":"SMB","active_customers":14,"avg_mrr":2316.22,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":100061.0,"cac":3334.0,"ltv_cac_ratio":30.0,"payback_months":2.0},{"period_month":"2023-09","segment":"Mid-Market","active_customers":10,"avg_mrr":5329.31,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":230226.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2023-09","segment":"Enterprise","active_customers":9,"avg_mrr":7153.2,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":309018.0,"cac":10929.0,"ltv_cac_ratio":28.3,"payback_months":2.1},{"period_month":"2023-10","segment":"SMB","active_customers":15,"avg_mrr":2293.6,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":99084.0,"cac":4208.0,"ltv_cac_ratio":23.5,"payback_months":2.5},{"period_month":"2023-10","segment":"Mid-Market","active_customers":11,"avg_mrr":5371.06,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":232030.0,"cac":23816.0,"ltv_cac_ratio":9.7,"payback_months":6.2},{"period_month":"2023-10","segment":"Enterprise","active_customers":9,"avg_mrr":7492.52,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":323677.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2023-11","segment":"SMB","active_customers":15,"avg_mrr":2241.98,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":96854.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2023-11","segment":"Mid-Market","active_customers":12,"avg_mrr":5522.97,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":238592.0,"cac":22244.0,"ltv_cac_ratio":10.7,"payback_months":5.6},{"period_month":"2023-11","segment":"Enterprise","active_customers":10,"avg_mrr":7347.28,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":317402.0,"cac":22886.0,"ltv_cac_ratio":13.9,"payback_months":4.3},{"period_month":"2023-12","segment":"SMB","active_customers":17,"avg_mrr":2224.65,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":96105.0,"cac":5055.0,"ltv_cac_ratio":19.0,"payback_months":3.2},{"period_month":"2023-12","segment":"Mid-Market","active_customers":12,"avg_mrr":5577.81,"annual_churn_rate_pct":13.2,"monthly_churn_rate_pct":1.1,"ltv":240962.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2023-12","segment":"Enterprise","active_customers":10,"avg_mrr":7281.56,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":314563.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2024-01","segment":"SMB","active_customers":17,"avg_mrr":2206.51,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":95321.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2024-01","segment":"Mid-Market","active_customers":12,"avg_mrr":5589.31,"annual_churn_rate_pct":12.6,"monthly_churn_rate_pct":1.05,"ltv":241458.0,"cac":20086.0,"ltv_cac_ratio":12.0,"payback_months":5.0},{"period_month":"2024-01","segment":"Enterprise","active_customers":11,"avg_mrr":7728.88,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":333887.0,"cac":63441.0,"ltv_cac_ratio":5.3,"payback_months":11.4},{"period_month":"2024-02","segment":"SMB","active_customers":18,"avg_mrr":2254.16,"annual_churn_rate_pct":20.8,"monthly_churn_rate_pct":1.73,"ltv":93852.0,"cac":10023.0,"ltv_cac_ratio":9.4,"payback_months":6.2},{"period_month":"2024-02","segment":"Mid-Market","active_customers":13,"avg_mrr":5224.55,"annual_churn_rate_pct":12.1,"monthly_churn_rate_pct":1.01,"ltv":225701.0,"cac":7464.0,"ltv_cac_ratio":30.2,"payback_months":2.0},{"period_month":"2024-02","segment":"Enterprise","active_customers":12,"avg_mrr":8472.47,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":366011.0,"cac":84652.0,"ltv_cac_ratio":4.3,"payback_months":13.9},{"period_month":"2024-03","segment":"SMB","active_customers":17,"avg_mrr":2038.22,"annual_churn_rate_pct":19.9,"monthly_churn_rate_pct":1.66,"ltv":88051.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2024-03","segment":"Mid-Market","active_customers":14,"avg_mrr":5084.96,"annual_churn_rate_pct":10.9,"monthly_churn_rate_pct":0.91,"ltv":219670.0,"cac":7497.0,"ltv_cac_ratio":29.3,"payback_months":2.0},{"period_month":"2024-03","segment":"Enterprise","active_customers":13,"avg_mrr":7928.84,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":342526.0,"cac":8976.0,"ltv_cac_ratio":38.2,"payback_months":1.6},{"period_month":"2024-04","segment":"SMB","active_customers":17,"avg_mrr":2007.31,"annual_churn_rate_pct":17.3,"monthly_churn_rate_pct":1.44,"ltv":86716.0,"cac":1273.0,"ltv_cac_ratio":68.1,"payback_months":0.9},{"period_month":"2024-04","segment":"Mid-Market","active_customers":15,"avg_mrr":5017.93,"annual_churn_rate_pct":15.2,"monthly_churn_rate_pct":1.26,"ltv":216775.0,"cac":26963.0,"ltv_cac_ratio":8.0,"payback_months":7.5},{"period_month":"2024-04","segment":"Enterprise","active_customers":14,"avg_mrr":7505.36,"annual_churn_rate_pct":6.0,"monthly_churn_rate_pct":0.5,"ltv":324231.0,"cac":10286.0,"ltv_cac_ratio":31.5,"payback_months":1.9},{"period_month":"2024-05","segment":"SMB","active_customers":17,"avg_mrr":2056.98,"annual_churn_rate_pct":20.0,"monthly_churn_rate_pct":1.67,"ltv":88832.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2024-05","segment":"Mid-Market","active_customers":15,"avg_mrr":4887.89,"annual_churn_rate_pct":14.2,"monthly_churn_rate_pct":1.18,"ltv":211157.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2024-05","segment":"Enterprise","active_customers":15,"avg_mrr":7804.32,"annual_churn_rate_pct":15.2,"monthly_churn_rate_pct":1.27,"ltv":337147.0,"cac":205939.0,"ltv_cac_ratio":1.6,"payback_months":36.6},{"period_month":"2024-06","segment":"SMB","active_customers":17,"avg_mrr":1944.06,"annual_churn_rate_pct":19.5,"monthly_churn_rate_pct":1.63,"ltv":83983.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2024-06","segment":"Mid-Market","active_customers":15,"avg_mrr":4882.43,"annual_churn_rate_pct":27.4,"monthly_churn_rate_pct":2.28,"ltv":153923.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2024-06","segment":"Enterprise","active_customers":14,"avg_mrr":7539.26,"annual_churn_rate_pct":18.8,"monthly_churn_rate_pct":1.56,"ltv":325696.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2024-07","segment":"SMB","active_customers":17,"avg_mrr":2007.81,"annual_churn_rate_pct":19.1,"monthly_churn_rate_pct":1.59,"ltv":86737.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2024-07","segment":"Mid-Market","active_customers":13,"avg_mrr":4916.74,"annual_churn_rate_pct":26.7,"monthly_churn_rate_pct":2.22,"ltv":159362.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2024-07","segment":"Enterprise","active_customers":13,"avg_mrr":7939.58,"annual_churn_rate_pct":18.0,"monthly_churn_rate_pct":1.5,"ltv":342990.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2024-08","segment":"SMB","active_customers":17,"avg_mrr":2006.0,"annual_churn_rate_pct":22.6,"monthly_churn_rate_pct":1.88,"ltv":76822.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2024-08","segment":"Mid-Market","active_customers":13,"avg_mrr":4902.92,"annual_churn_rate_pct":26.3,"monthly_churn_rate_pct":2.19,"ltv":160981.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2024-08","segment":"Enterprise","active_customers":13,"avg_mrr":7940.86,"annual_churn_rate_pct":17.3,"monthly_churn_rate_pct":1.45,"ltv":343045.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2024-09","segment":"SMB","active_customers":16,"avg_mrr":1992.96,"annual_churn_rate_pct":22.6,"monthly_churn_rate_pct":1.88,"ltv":76225.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2024-09","segment":"Mid-Market","active_customers":13,"avg_mrr":4915.16,"annual_churn_rate_pct":26.0,"monthly_churn_rate_pct":2.16,"ltv":163519.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2024-09","segment":"Enterprise","active_customers":13,"avg_mrr":7951.15,"annual_churn_rate_pct":19.0,"monthly_churn_rate_pct":1.58,"ltv":343490.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2024-10","segment":"SMB","active_customers":16,"avg_mrr":2047.73,"annual_churn_rate_pct":22.7,"monthly_churn_rate_pct":1.89,"ltv":78014.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2024-10","segment":"Mid-Market","active_customers":13,"avg_mrr":4973.15,"annual_churn_rate_pct":25.8,"monthly_churn_rate_pct":2.15,"ltv":166583.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2024-10","segment":"Enterprise","active_customers":12,"avg_mrr":8430.55,"annual_churn_rate_pct":18.4,"monthly_churn_rate_pct":1.54,"ltv":364200.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2024-11","segment":"SMB","active_customers":16,"avg_mrr":1995.48,"annual_churn_rate_pct":22.8,"monthly_churn_rate_pct":1.9,"ltv":75715.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2024-11","segment":"Mid-Market","active_customers":13,"avg_mrr":4951.28,"annual_churn_rate_pct":25.9,"monthly_churn_rate_pct":2.15,"ltv":165464.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2024-11","segment":"Enterprise","active_customers":12,"avg_mrr":8384.22,"annual_churn_rate_pct":18.0,"monthly_churn_rate_pct":1.5,"ltv":362198.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2024-12","segment":"SMB","active_customers":16,"avg_mrr":1987.35,"annual_churn_rate_pct":23.1,"monthly_churn_rate_pct":1.93,"ltv":74319.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2024-12","segment":"Mid-Market","active_customers":13,"avg_mrr":4954.44,"annual_churn_rate_pct":17.5,"monthly_churn_rate_pct":1.46,"ltv":214032.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0},{"period_month":"2024-12","segment":"Enterprise","active_customers":12,"avg_mrr":8406.87,"annual_churn_rate_pct":17.6,"monthly_churn_rate_pct":1.47,"ltv":363177.0,"cac":0.0,"ltv_cac_ratio":0.0,"payback_months":0.0}],"com":[{"period_month":"2023-01","opening":0.0,"new_capitalized":26869.11,"amortized":1492.73,"closing_balance":25376.38},{"period_month":"2023-02","opening":25376.38,"new_capitalized":17487.72,"amortized":2023.87,"closing_balance":42069.68},{"period_month":"2023-03","opening":42069.68,"new_capitalized":32762.01,"amortized":3327.05,"closing_balance":71504.64},{"period_month":"2023-04","opening":71504.64,"new_capitalized":70280.68,"amortized":5634.63,"closing_balance":135663.22},{"period_month":"2023-05","opening":135663.22,"new_capitalized":18574.8,"amortized":6380.89,"closing_balance":147057.75},{"period_month":"2023-06","opening":147057.75,"new_capitalized":113577.48,"amortized":9727.61,"closing_balance":250165.64},{"period_month":"2023-07","opening":250165.64,"new_capitalized":21425.94,"amortized":10620.35,"closing_balance":260971.23},{"period_month":"2023-08","opening":260971.23,"new_capitalized":47319.67,"amortized":12688.54,"closing_balance":295602.36},{"period_month":"2023-09","opening":295602.36,"new_capitalized":4991.76,"amortized":12859.61,"closing_balance":287734.51},{"period_month":"2023-10","opening":287734.51,"new_capitalized":16607.24,"amortized":13485.47,"closing_balance":290856.28},{"period_month":"2023-11","opening":290856.28,"new_capitalized":19576.88,"amortized":14172.29,"closing_balance":296260.87},{"period_month":"2023-12","opening":296260.87,"new_capitalized":3538.45,"amortized":14368.86,"closing_balance":285430.46},{"period_month":"2024-01","opening":285430.46,"new_capitalized":29606.63,"amortized":14608.33,"closing_balance":292069.34},{"period_month":"2024-02","opening":292069.34,"new_capitalized":35748.45,"amortized":15735.07,"closing_balance":309915.8},{"period_month":"2024-03","opening":309915.8,"new_capitalized":7227.14,"amortized":15504.7,"closing_balance":296271.74},{"period_month":"2024-04","opening":296271.74,"new_capitalized":13910.1,"amortized":16040.46,"closing_balance":290303.86},{"period_month":"2024-05","opening":290303.86,"new_capitalized":72078.72,"amortized":17914.44,"closing_balance":342614.8},{"period_month":"2024-06","opening":342614.8,"new_capitalized":589.3,"amortized":17246.01,"closing_balance":306125.03},{"period_month":"2024-07","opening":306125.03,"new_capitalized":1861.73,"amortized":16599.35,"closing_balance":283164.54},{"period_month":"2024-08","opening":283164.54,"new_capitalized":0.0,"amortized":16599.35,"closing_balance":268239.09},{"period_month":"2024-09","opening":268239.09,"new_capitalized":0.0,"amortized":16515.93,"closing_balance":252702.74},{"period_month":"2024-10","opening":252702.74,"new_capitalized":0.0,"amortized":16409.68,"closing_balance":235889.8},{"period_month":"2024-11","opening":235889.8,"new_capitalized":0.0,"amortized":16409.68,"closing_balance":221638.16},{"period_month":"2024-12","opening":221638.16,"new_capitalized":0.0,"amortized":16409.68,"closing_balance":207427.81}],"coh_periods":["2023-01","2023-02","2023-03","2023-04","2023-05","2023-06","2023-07","2023-08","2023-09","2023-10","2023-11","2023-12","2024-01","2024-02","2024-03","2024-04","2024-05"],"coh":[{"cohort_month":"2023-01","period_month":"2023-01","months_since":0,"cohort_mrr":16397.63,"base_mrr":16397.63,"retention_pct":100.0},{"cohort_month":"2023-01","period_month":"2023-02","months_since":1,"cohort_mrr":16397.63,"base_mrr":16397.63,"retention_pct":100.0},{"cohort_month":"2023-01","period_month":"2023-03","months_since":2,"cohort_mrr":16543.72,"base_mrr":16397.63,"retention_pct":100.9},{"cohort_month":"2023-01","period_month":"2023-04","months_since":3,"cohort_mrr":16470.78,"base_mrr":16397.63,"retention_pct":100.4},{"cohort_month":"2023-01","period_month":"2023-05","months_since":4,"cohort_mrr":16342.34,"base_mrr":16397.63,"retention_pct":99.7},{"cohort_month":"2023-01","period_month":"2023-06","months_since":5,"cohort_mrr":16342.34,"base_mrr":16397.63,"retention_pct":99.7},{"cohort_month":"2023-01","period_month":"2023-07","months_since":6,"cohort_mrr":16342.34,"base_mrr":16397.63,"retention_pct":99.7},{"cohort_month":"2023-01","period_month":"2023-08","months_since":7,"cohort_mrr":16342.34,"base_mrr":16397.63,"retention_pct":99.7},{"cohort_month":"2023-01","period_month":"2023-09","months_since":8,"cohort_mrr":16342.34,"base_mrr":16397.63,"retention_pct":99.7},{"cohort_month":"2023-01","period_month":"2023-10","months_since":9,"cohort_mrr":16342.34,"base_mrr":16397.63,"retention_pct":99.7},{"cohort_month":"2023-01","period_month":"2023-11","months_since":10,"cohort_mrr":16342.34,"base_mrr":16397.63,"retention_pct":99.7},{"cohort_month":"2023-01","period_month":"2023-12","months_since":11,"cohort_mrr":16342.34,"base_mrr":16397.63,"retention_pct":99.7},{"cohort_month":"2023-01","period_month":"2024-01","months_since":12,"cohort_mrr":16342.34,"base_mrr":16397.63,"retention_pct":99.7},{"cohort_month":"2023-01","period_month":"2024-02","months_since":13,"cohort_mrr":16342.34,"base_mrr":16397.63,"retention_pct":99.7},{"cohort_month":"2023-01","period_month":"2024-03","months_since":14,"cohort_mrr":16342.34,"base_mrr":16397.63,"retention_pct":99.7},{"cohort_month":"2023-01","period_month":"2024-04","months_since":15,"cohort_mrr":16342.34,"base_mrr":16397.63,"retention_pct":99.7},{"cohort_month":"2023-01","period_month":"2024-05","months_since":16,"cohort_mrr":16342.34,"base_mrr":16397.63,"retention_pct":99.7},{"cohort_month":"2023-01","period_month":"2024-06","months_since":17,"cohort_mrr":16342.34,"base_mrr":16397.63,"retention_pct":99.7},{"cohort_month":"2023-01","period_month":"2024-07","months_since":18,"cohort_mrr":16342.34,"base_mrr":16397.63,"retention_pct":99.7},{"cohort_month":"2023-01","period_month":"2024-08","months_since":19,"cohort_mrr":16342.34,"base_mrr":16397.63,"retention_pct":99.7},{"cohort_month":"2023-01","period_month":"2024-09","months_since":20,"cohort_mrr":16342.34,"base_mrr":16397.63,"retention_pct":99.7},{"cohort_month":"2023-01","period_month":"2024-10","months_since":21,"cohort_mrr":16342.34,"base_mrr":16397.63,"retention_pct":99.7},{"cohort_month":"2023-01","period_month":"2024-11","months_since":22,"cohort_mrr":16342.34,"base_mrr":16397.63,"retention_pct":99.7},{"cohort_month":"2023-01","period_month":"2024-12","months_since":23,"cohort_mrr":16342.34,"base_mrr":16397.63,"retention_pct":99.7},{"cohort_month":"2023-02","period_month":"2023-02","months_since":0,"cohort_mrr":10212.37,"base_mrr":10212.37,"retention_pct":100.0},{"cohort_month":"2023-02","period_month":"2023-03","months_since":1,"cohort_mrr":10198.97,"base_mrr":10212.37,"retention_pct":99.9},{"cohort_month":"2023-02","period_month":"2023-04","months_since":2,"cohort_mrr":10169.1,"base_mrr":10212.37,"retention_pct":99.6},{"cohort_month":"2023-02","period_month":"2023-05","months_since":3,"cohort_mrr":10198.88,"base_mrr":10212.37,"retention_pct":99.9},{"cohort_month":"2023-02","period_month":"2023-06","months_since":4,"cohort_mrr":10178.5,"base_mrr":10212.37,"retention_pct":99.7},{"cohort_month":"2023-02","period_month":"2023-07","months_since":5,"cohort_mrr":10169.1,"base_mrr":10212.37,"retention_pct":99.6},{"cohort_month":"2023-02","period_month":"2023-08","months_since":6,"cohort_mrr":10192.08,"base_mrr":10212.37,"retention_pct":99.8},{"cohort_month":"2023-02","period_month":"2023-09","months_since":7,"cohort_mrr":10254.13,"base_mrr":10212.37,"retention_pct":100.4},{"cohort_month":"2023-02","period_month":"2023-10","months_since":8,"cohort_mrr":10212.33,"base_mrr":10212.37,"retention_pct":100.0},{"cohort_month":"2023-02","period_month":"2023-11","months_since":9,"cohort_mrr":10169.1,"base_mrr":10212.37,"retention_pct":99.6},{"cohort_month":"2023-02","period_month":"2023-12","months_since":10,"cohort_mrr":10244.94,"base_mrr":10212.37,"retention_pct":100.3},{"cohort_month":"2023-02","period_month":"2024-01","months_since":11,"cohort_mrr":10223.59,"base_mrr":10212.37,"retention_pct":100.1},{"cohort_month":"2023-02","period_month":"2024-02","months_since":12,"cohort_mrr":10226.42,"base_mrr":10212.37,"retention_pct":100.1},{"cohort_month":"2023-02","period_month":"2024-03","months_since":13,"cohort_mrr":10169.1,"base_mrr":10212.37,"retention_pct":99.6},{"cohort_month":"2023-02","period_month":"2024-04","months_since":14,"cohort_mrr":10169.1,"base_mrr":10212.37,"retention_pct":99.6},{"cohort_month":"2023-02","period_month":"2024-05","months_since":15,"cohort_mrr":10169.1,"base_mrr":10212.37,"retention_pct":99.6},{"cohort_month":"2023-02","period_month":"2024-06","months_since":16,"cohort_mrr":10169.1,"base_mrr":10212.37,"retention_pct":99.6},{"cohort_month":"2023-02","period_month":"2024-07","months_since":17,"cohort_mrr":10219.0,"base_mrr":10212.37,"retention_pct":100.1},{"cohort_month":"2023-02","period_month":"2024-08","months_since":18,"cohort_mrr":10218.62,"base_mrr":10212.37,"retention_pct":100.1},{"cohort_month":"2023-02","period_month":"2024-09","months_since":19,"cohort_mrr":10258.83,"base_mrr":10212.37,"retention_pct":100.5},{"cohort_month":"2023-02","period_month":"2024-10","months_since":20,"cohort_mrr":10225.36,"base_mrr":10212.37,"retention_pct":100.1},{"cohort_month":"2023-02","period_month":"2024-11","months_since":21,"cohort_mrr":10184.82,"base_mrr":10212.37,"retention_pct":99.7},{"cohort_month":"2023-02","period_month":"2024-12","months_since":22,"cohort_mrr":10169.1,"base_mrr":10212.37,"retention_pct":99.6},{"cohort_month":"2023-03","period_month":"2023-03","months_since":0,"cohort_mrr":13705.27,"base_mrr":13705.27,"retention_pct":100.0},{"cohort_month":"2023-03","period_month":"2023-04","months_since":1,"cohort_mrr":13705.27,"base_mrr":13705.27,"retention_pct":100.0},{"cohort_month":"2023-03","period_month":"2023-05","months_since":2,"cohort_mrr":13705.27,"base_mrr":13705.27,"retention_pct":100.0},{"cohort_month":"2023-03","period_month":"2023-06","months_since":3,"cohort_mrr":13705.27,"base_mrr":13705.27,"retention_pct":100.0},{"cohort_month":"2023-03","period_month":"2023-07","months_since":4,"cohort_mrr":13705.27,"base_mrr":13705.27,"retention_pct":100.0},{"cohort_month":"2023-03","period_month":"2023-08","months_since":5,"cohort_mrr":14163.87,"base_mrr":13705.27,"retention_pct":103.3},{"cohort_month":"2023-03","period_month":"2023-09","months_since":6,"cohort_mrr":14163.87,"base_mrr":13705.27,"retention_pct":103.3},{"cohort_month":"2023-03","period_month":"2023-10","months_since":7,"cohort_mrr":14163.87,"base_mrr":13705.27,"retention_pct":103.3},{"cohort_month":"2023-03","period_month":"2023-11","months_since":8,"cohort_mrr":14163.87,"base_mrr":13705.27,"retention_pct":103.3},{"cohort_month":"2023-03","period_month":"2023-12","months_since":9,"cohort_mrr":14163.87,"base_mrr":13705.27,"retention_pct":103.3},{"cohort_month":"2023-03","period_month":"2024-01","months_since":10,"cohort_mrr":14163.87,"base_mrr":13705.27,"retention_pct":103.3},{"cohort_month":"2023-03","period_month":"2024-02","months_since":11,"cohort_mrr":14163.87,"base_mrr":13705.27,"retention_pct":103.3},{"cohort_month":"2023-03","period_month":"2024-03","months_since":12,"cohort_mrr":14163.87,"base_mrr":13705.27,"retention_pct":103.3},{"cohort_month":"2023-03","period_month":"2024-04","months_since":13,"cohort_mrr":14163.87,"base_mrr":13705.27,"retention_pct":103.3},{"cohort_month":"2023-03","period_month":"2024-05","months_since":14,"cohort_mrr":14163.87,"base_mrr":13705.27,"retention_pct":103.3},{"cohort_month":"2023-03","period_month":"2024-06","months_since":15,"cohort_mrr":14163.87,"base_mrr":13705.27,"retention_pct":103.3},{"cohort_month":"2023-03","period_month":"2024-07","months_since":16,"cohort_mrr":14163.87,"base_mrr":13705.27,"retention_pct":103.3},{"cohort_month":"2023-03","period_month":"2024-08","months_since":17,"cohort_mrr":14163.87,"base_mrr":13705.27,"retention_pct":103.3},{"cohort_month":"2023-03","period_month":"2024-09","months_since":18,"cohort_mrr":14163.87,"base_mrr":13705.27,"retention_pct":103.3},{"cohort_month":"2023-03","period_month":"2024-10","months_since":19,"cohort_mrr":14163.87,"base_mrr":13705.27,"retention_pct":103.3},{"cohort_month":"2023-03","period_month":"2024-11","months_since":20,"cohort_mrr":14163.87,"base_mrr":13705.27,"retention_pct":103.3},{"cohort_month":"2023-03","period_month":"2024-12","months_since":21,"cohort_mrr":14163.87,"base_mrr":13705.27,"retention_pct":103.3},{"cohort_month":"2023-04","period_month":"2023-04","months_since":0,"cohort_mrr":31028.77,"base_mrr":31028.77,"retention_pct":100.0},{"cohort_month":"2023-04","period_month":"2023-05","months_since":1,"cohort_mrr":31028.77,"base_mrr":31028.77,"retention_pct":100.0},{"cohort_month":"2023-04","period_month":"2023-06","months_since":2,"cohort_mrr":31028.77,"base_mrr":31028.77,"retention_pct":100.0},{"cohort_month":"2023-04","period_month":"2023-07","months_since":3,"cohort_mrr":31169.93,"base_mrr":31028.77,"retention_pct":100.5},{"cohort_month":"2023-04","period_month":"2023-08","months_since":4,"cohort_mrr":36319.13,"base_mrr":31028.77,"retention_pct":117.0},{"cohort_month":"2023-04","period_month":"2023-09","months_since":5,"cohort_mrr":36142.94,"base_mrr":31028.77,"retention_pct":116.5},{"cohort_month":"2023-04","period_month":"2023-10","months_since":6,"cohort_mrr":36094.12,"base_mrr":31028.77,"retention_pct":116.3},{"cohort_month":"2023-04","period_month":"2023-11","months_since":7,"cohort_mrr":36347.17,"base_mrr":31028.77,"retention_pct":117.1},{"cohort_month":"2023-04","period_month":"2023-12","months_since":8,"cohort_mrr":36094.12,"base_mrr":31028.77,"retention_pct":116.3},{"cohort_month":"2023-04","period_month":"2024-01","months_since":9,"cohort_mrr":36208.31,"base_mrr":31028.77,"retention_pct":116.7},{"cohort_month":"2023-04","period_month":"2024-02","months_since":10,"cohort_mrr":36307.18,"base_mrr":31028.77,"retention_pct":117.0},{"cohort_month":"2023-04","period_month":"2024-03","months_since":11,"cohort_mrr":36094.12,"base_mrr":31028.77,"retention_pct":116.3},{"cohort_month":"2023-04","period_month":"2024-04","months_since":12,"cohort_mrr":36094.12,"base_mrr":31028.77,"retention_pct":116.3},{"cohort_month":"2023-04","period_month":"2024-05","months_since":13,"cohort_mrr":36094.12,"base_mrr":31028.77,"retention_pct":116.3},{"cohort_month":"2023-04","period_month":"2024-06","months_since":14,"cohort_mrr":36383.46,"base_mrr":31028.77,"retention_pct":117.3},{"cohort_month":"2023-04","period_month":"2024-07","months_since":15,"cohort_mrr":36094.12,"base_mrr":31028.77,"retention_pct":116.3},{"cohort_month":"2023-04","period_month":"2024-08","months_since":16,"cohort_mrr":36110.71,"base_mrr":31028.77,"retention_pct":116.4},{"cohort_month":"2023-04","period_month":"2024-09","months_since":17,"cohort_mrr":36244.5,"base_mrr":31028.77,"retention_pct":116.8},{"cohort_month":"2023-04","period_month":"2024-10","months_since":18,"cohort_mrr":36171.09,"base_mrr":31028.77,"retention_pct":116.6},{"cohort_month":"2023-04","period_month":"2024-11","months_since":19,"cohort_mrr":36094.12,"base_mrr":31028.77,"retention_pct":116.3},{"cohort_month":"2023-04","period_month":"2024-12","months_since":20,"cohort_mrr":36365.87,"base_mrr":31028.77,"retention_pct":117.2},{"cohort_month":"2023-05","period_month":"2023-05","months_since":0,"cohort_mrr":6346.31,"base_mrr":6346.31,"retention_pct":100.0},{"cohort_month":"2023-05","period_month":"2023-06","months_since":1,"cohort_mrr":6346.31,"base_mrr":6346.31,"retention_pct":100.0},{"cohort_month":"2023-05","period_month":"2023-07","months_since":2,"cohort_mrr":6346.31,"base_mrr":6346.31,"retention_pct":100.0},{"cohort_month":"2023-05","period_month":"2023-08","months_since":3,"cohort_mrr":6346.31,"base_mrr":6346.31,"retention_pct":100.0},{"cohort_month":"2023-05","period_month":"2023-09","months_since":4,"cohort_mrr":6346.31,"base_mrr":6346.31,"retention_pct":100.0},{"cohort_month":"2023-05","period_month":"2023-10","months_since":5,"cohort_mrr":6548.58,"base_mrr":6346.31,"retention_pct":103.2},{"cohort_month":"2023-05","period_month":"2023-11","months_since":6,"cohort_mrr":6548.58,"base_mrr":6346.31,"retention_pct":103.2},{"cohort_month":"2023-05","period_month":"2023-12","months_since":7,"cohort_mrr":6548.58,"base_mrr":6346.31,"retention_pct":103.2},{"cohort_month":"2023-05","period_month":"2024-01","months_since":8,"cohort_mrr":834.12,"base_mrr":6346.31,"retention_pct":13.1},{"cohort_month":"2023-05","period_month":"2024-02","months_since":9,"cohort_mrr":834.12,"base_mrr":6346.31,"retention_pct":13.1},{"cohort_month":"2023-05","period_month":"2024-03","months_since":10,"cohort_mrr":834.12,"base_mrr":6346.31,"retention_pct":13.1},{"cohort_month":"2023-05","period_month":"2024-04","months_since":11,"cohort_mrr":834.12,"base_mrr":6346.31,"retention_pct":13.1},{"cohort_month":"2023-05","period_month":"2024-05","months_since":12,"cohort_mrr":834.12,"base_mrr":6346.31,"retention_pct":13.1},{"cohort_month":"2023-05","period_month":"2024-06","months_since":13,"cohort_mrr":834.12,"base_mrr":6346.31,"retention_pct":13.1},{"cohort_month":"2023-05","period_month":"2024-07","months_since":14,"cohort_mrr":834.12,"base_mrr":6346.31,"retention_pct":13.1},{"cohort_month":"2023-05","period_month":"2024-08","months_since":15,"cohort_mrr":834.12,"base_mrr":6346.31,"retention_pct":13.1},{"cohort_month":"2023-05","period_month":"2024-09","months_since":16,"cohort_mrr":834.12,"base_mrr":6346.31,"retention_pct":13.1},{"cohort_month":"2023-05","period_month":"2024-10","months_since":17,"cohort_mrr":834.12,"base_mrr":6346.31,"retention_pct":13.1},{"cohort_month":"2023-05","period_month":"2024-11","months_since":18,"cohort_mrr":834.12,"base_mrr":6346.31,"retention_pct":13.1},{"cohort_month":"2023-05","period_month":"2024-12","months_since":19,"cohort_mrr":834.12,"base_mrr":6346.31,"retention_pct":13.1},{"cohort_month":"2023-06","period_month":"2023-06","months_since":0,"cohort_mrr":40049.68,"base_mrr":40049.68,"retention_pct":100.0},{"cohort_month":"2023-06","period_month":"2023-07","months_since":1,"cohort_mrr":40202.07,"base_mrr":40049.68,"retention_pct":100.4},{"cohort_month":"2023-06","period_month":"2023-08","months_since":2,"cohort_mrr":40425.18,"base_mrr":40049.68,"retention_pct":100.9},{"cohort_month":"2023-06","period_month":"2023-09","months_since":3,"cohort_mrr":40049.68,"base_mrr":40049.68,"retention_pct":100.0},{"cohort_month":"2023-06","period_month":"2023-10","months_since":4,"cohort_mrr":43010.26,"base_mrr":40049.68,"retention_pct":107.4},{"cohort_month":"2023-06","period_month":"2023-11","months_since":5,"cohort_mrr":44731.42,"base_mrr":40049.68,"retention_pct":111.7},{"cohort_month":"2023-06","period_month":"2023-12","months_since":6,"cohort_mrr":44327.28,"base_mrr":40049.68,"retention_pct":110.7},{"cohort_month":"2023-06","period_month":"2024-01","months_since":7,"cohort_mrr":44079.43,"base_mrr":40049.68,"retention_pct":110.1},{"cohort_month":"2023-06","period_month":"2024-02","months_since":8,"cohort_mrr":44172.46,"base_mrr":40049.68,"retention_pct":110.3},{"cohort_month":"2023-06","period_month":"2024-03","months_since":9,"cohort_mrr":44045.48,"base_mrr":40049.68,"retention_pct":110.0},{"cohort_month":"2023-06","period_month":"2024-04","months_since":10,"cohort_mrr":44045.48,"base_mrr":40049.68,"retention_pct":110.0},{"cohort_month":"2023-06","period_month":"2024-05","months_since":11,"cohort_mrr":44045.48,"base_mrr":40049.68,"retention_pct":110.0},{"cohort_month":"2023-06","period_month":"2024-06","months_since":12,"cohort_mrr":44215.0,"base_mrr":40049.68,"retention_pct":110.4},{"cohort_month":"2023-06","period_month":"2024-07","months_since":13,"cohort_mrr":31674.58,"base_mrr":40049.68,"retention_pct":79.1},{"cohort_month":"2023-06","period_month":"2024-08","months_since":14,"cohort_mrr":31674.58,"base_mrr":40049.68,"retention_pct":79.1},{"cohort_month":"2023-06","period_month":"2024-09","months_since":15,"cohort_mrr":31674.58,"base_mrr":40049.68,"retention_pct":79.1},{"cohort_month":"2023-06","period_month":"2024-10","months_since":16,"cohort_mrr":31674.58,"base_mrr":40049.68,"retention_pct":79.1},{"cohort_month":"2023-06","period_month":"2024-11","months_since":17,"cohort_mrr":31674.58,"base_mrr":40049.68,"retention_pct":79.1},{"cohort_month":"2023-06","period_month":"2024-12","months_since":18,"cohort_mrr":31674.58,"base_mrr":40049.68,"retention_pct":79.1},{"cohort_month":"2023-07","period_month":"2023-07","months_since":0,"cohort_mrr":7907.27,"base_mrr":7907.27,"retention_pct":100.0},{"cohort_month":"2023-07","period_month":"2023-08","months_since":1,"cohort_mrr":7593.03,"base_mrr":7907.27,"retention_pct":96.0},{"cohort_month":"2023-07","period_month":"2023-09","months_since":2,"cohort_mrr":7439.56,"base_mrr":7907.27,"retention_pct":94.1},{"cohort_month":"2023-07","period_month":"2023-10","months_since":3,"cohort_mrr":7439.56,"base_mrr":7907.27,"retention_pct":94.1},{"cohort_month":"2023-07","period_month":"2023-11","months_since":4,"cohort_mrr":8842.96,"base_mrr":7907.27,"retention_pct":111.8},{"cohort_month":"2023-07","period_month":"2023-12","months_since":5,"cohort_mrr":9501.13,"base_mrr":7907.27,"retention_pct":120.2},{"cohort_month":"2023-07","period_month":"2024-01","months_since":6,"cohort_mrr":9437.37,"base_mrr":7907.27,"retention_pct":119.4},{"cohort_month":"2023-07","period_month":"2024-02","months_since":7,"cohort_mrr":9377.81,"base_mrr":7907.27,"retention_pct":118.6},{"cohort_month":"2023-07","period_month":"2024-03","months_since":8,"cohort_mrr":8842.96,"base_mrr":7907.27,"retention_pct":111.8},{"cohort_month":"2023-07","period_month":"2024-04","months_since":9,"cohort_mrr":8842.96,"base_mrr":7907.27,"retention_pct":111.8},{"cohort_month":"2023-07","period_month":"2024-05","months_since":10,"cohort_mrr":9436.46,"base_mrr":7907.27,"retention_pct":119.3},{"cohort_month":"2023-07","period_month":"2024-06","months_since":11,"cohort_mrr":9523.69,"base_mrr":7907.27,"retention_pct":120.4},{"cohort_month":"2023-07","period_month":"2024-07","months_since":12,"cohort_mrr":8842.96,"base_mrr":7907.27,"retention_pct":111.8},{"cohort_month":"2023-07","period_month":"2024-08","months_since":13,"cohort_mrr":8940.29,"base_mrr":7907.27,"retention_pct":113.1},{"cohort_month":"2023-07","period_month":"2024-09","months_since":14,"cohort_mrr":8842.96,"base_mrr":7907.27,"retention_pct":111.8},{"cohort_month":"2023-07","period_month":"2024-10","months_since":15,"cohort_mrr":9287.87,"base_mrr":7907.27,"retention_pct":117.5},{"cohort_month":"2023-07","period_month":"2024-11","months_since":16,"cohort_mrr":9294.47,"base_mrr":7907.27,"retention_pct":117.5},{"cohort_month":"2023-07","period_month":"2024-12","months_since":17,"cohort_mrr":8842.96,"base_mrr":7907.27,"retention_pct":111.8},{"cohort_month":"2023-08","period_month":"2023-08","months_since":0,"cohort_mrr":17641.51,"base_mrr":17641.51,"retention_pct":100.0},{"cohort_month":"2023-08","period_month":"2023-09","months_since":1,"cohort_mrr":16587.02,"base_mrr":17641.51,"retention_pct":94.0},{"cohort_month":"2023-08","period_month":"2023-10","months_since":2,"cohort_mrr":17318.13,"base_mrr":17641.51,"retention_pct":98.2},{"cohort_month":"2023-08","period_month":"2023-11","months_since":3,"cohort_mrr":16587.02,"base_mrr":17641.51,"retention_pct":94.0},{"cohort_month":"2023-08","period_month":"2023-12","months_since":4,"cohort_mrr":17751.8,"base_mrr":17641.51,"retention_pct":100.6},{"cohort_month":"2023-08","period_month":"2024-01","months_since":5,"cohort_mrr":18498.87,"base_mrr":17641.51,"retention_pct":104.9},{"cohort_month":"2023-08","period_month":"2024-02","months_since":6,"cohort_mrr":18636.95,"base_mrr":17641.51,"retention_pct":105.6},{"cohort_month":"2023-08","period_month":"2024-03","months_since":7,"cohort_mrr":12921.97,"base_mrr":17641.51,"retention_pct":73.2},{"cohort_month":"2023-08","period_month":"2024-04","months_since":8,"cohort_mrr":14483.31,"base_mrr":17641.51,"retention_pct":82.1},{"cohort_month":"2023-08","period_month":"2024-05","months_since":9,"cohort_mrr":12415.31,"base_mrr":17641.51,"retention_pct":70.4},{"cohort_month":"2023-08","period_month":"2024-06","months_since":10,"cohort_mrr":11570.78,"base_mrr":17641.51,"retention_pct":65.6},{"cohort_month":"2023-08","period_month":"2024-07","months_since":11,"cohort_mrr":12604.62,"base_mrr":17641.51,"retention_pct":71.4},{"cohort_month":"2023-08","period_month":"2024-08","months_since":12,"cohort_mrr":12574.33,"base_mrr":17641.51,"retention_pct":71.3},{"cohort_month":"2023-08","period_month":"2024-09","months_since":13,"cohort_mrr":11570.78,"base_mrr":17641.51,"retention_pct":65.6},{"cohort_month":"2023-08","period_month":"2024-10","months_since":14,"cohort_mrr":12480.54,"base_mrr":17641.51,"retention_pct":70.7},{"cohort_month":"2023-08","period_month":"2024-11","months_since":15,"cohort_mrr":11685.13,"base_mrr":17641.51,"retention_pct":66.2},{"cohort_month":"2023-08","period_month":"2024-12","months_since":16,"cohort_mrr":11570.78,"base_mrr":17641.51,"retention_pct":65.6},{"cohort_month":"2023-09","period_month":"2023-09","months_since":0,"cohort_mrr":2773.2,"base_mrr":2773.2,"retention_pct":100.0},{"cohort_month":"2023-09","period_month":"2023-10","months_since":1,"cohort_mrr":2773.2,"base_mrr":2773.2,"retention_pct":100.0},{"cohort_month":"2023-09","period_month":"2023-11","months_since":2,"cohort_mrr":2773.2,"base_mrr":2773.2,"retention_pct":100.0},{"cohort_month":"2023-09","period_month":"2023-12","months_since":3,"cohort_mrr":2773.2,"base_mrr":2773.2,"retention_pct":100.0},{"cohort_month":"2023-09","period_month":"2024-01","months_since":4,"cohort_mrr":2773.2,"base_mrr":2773.2,"retention_pct":100.0},{"cohort_month":"2023-09","period_month":"2024-02","months_since":5,"cohort_mrr":2773.2,"base_mrr":2773.2,"retention_pct":100.0},{"cohort_month":"2023-09","period_month":"2024-03","months_since":6,"cohort_mrr":2620.43,"base_mrr":2773.2,"retention_pct":94.5},{"cohort_month":"2023-09","period_month":"2024-04","months_since":7,"cohort_mrr":2620.43,"base_mrr":2773.2,"retention_pct":94.5},{"cohort_month":"2023-09","period_month":"2024-05","months_since":8,"cohort_mrr":2620.43,"base_mrr":2773.2,"retention_pct":94.5},{"cohort_month":"2023-09","period_month":"2024-06","months_since":9,"cohort_mrr":2620.43,"base_mrr":2773.2,"retention_pct":94.5},{"cohort_month":"2023-09","period_month":"2024-07","months_since":10,"cohort_mrr":2620.43,"base_mrr":2773.2,"retention_pct":94.5},{"cohort_month":"2023-09","period_month":"2024-08","months_since":11,"cohort_mrr":2620.43,"base_mrr":2773.2,"retention_pct":94.5},{"cohort_month":"2023-09","period_month":"2024-09","months_since":12,"cohort_mrr":2620.43,"base_mrr":2773.2,"retention_pct":94.5},{"cohort_month":"2023-09","period_month":"2024-10","months_since":13,"cohort_mrr":495.44,"base_mrr":2773.2,"retention_pct":17.9},{"cohort_month":"2023-09","period_month":"2024-11","months_since":14,"cohort_mrr":495.44,"base_mrr":2773.2,"retention_pct":17.9},{"cohort_month":"2023-09","period_month":"2024-12","months_since":15,"cohort_mrr":495.44,"base_mrr":2773.2,"retention_pct":17.9},{"cohort_month":"2023-10","period_month":"2023-10","months_since":0,"cohort_mrr":7015.96,"base_mrr":7015.96,"retention_pct":100.0},{"cohort_month":"2023-10","period_month":"2023-11","months_since":1,"cohort_mrr":7015.96,"base_mrr":7015.96,"retention_pct":100.0},{"cohort_month":"2023-10","period_month":"2023-12","months_since":2,"cohort_mrr":7015.96,"base_mrr":7015.96,"retention_pct":100.0},{"cohort_month":"2023-10","period_month":"2024-01","months_since":3,"cohort_mrr":7015.96,"base_mrr":7015.96,"retention_pct":100.0},{"cohort_month":"2023-10","period_month":"2024-02","months_since":4,"cohort_mrr":7015.96,"base_mrr":7015.96,"retention_pct":100.0},{"cohort_month":"2023-10","period_month":"2024-03","months_since":5,"cohort_mrr":7318.85,"base_mrr":7015.96,"retention_pct":104.3},{"cohort_month":"2023-10","period_month":"2024-04","months_since":6,"cohort_mrr":7318.85,"base_mrr":7015.96,"retention_pct":104.3},{"cohort_month":"2023-10","period_month":"2024-05","months_since":7,"cohort_mrr":7318.85,"base_mrr":7015.96,"retention_pct":104.3},{"cohort_month":"2023-10","period_month":"2024-06","months_since":8,"cohort_mrr":7318.85,"base_mrr":7015.96,"retention_pct":104.3},{"cohort_month":"2023-10","period_month":"2024-07","months_since":9,"cohort_mrr":7318.85,"base_mrr":7015.96,"retention_pct":104.3},{"cohort_month":"2023-10","period_month":"2024-08","months_since":10,"cohort_mrr":7318.85,"base_mrr":7015.96,"retention_pct":104.3},{"cohort_month":"2023-10","period_month":"2024-09","months_since":11,"cohort_mrr":7318.85,"base_mrr":7015.96,"retention_pct":104.3},{"cohort_month":"2023-10","period_month":"2024-10","months_since":12,"cohort_mrr":7318.85,"base_mrr":7015.96,"retention_pct":104.3},{"cohort_month":"2023-10","period_month":"2024-11","months_since":13,"cohort_mrr":7318.85,"base_mrr":7015.96,"retention_pct":104.3},{"cohort_month":"2023-10","period_month":"2024-12","months_since":14,"cohort_mrr":7318.85,"base_mrr":7015.96,"retention_pct":104.3},{"cohort_month":"2023-11","period_month":"2023-11","months_since":0,"cohort_mrr":9856.44,"base_mrr":9856.44,"retention_pct":100.0},{"cohort_month":"2023-11","period_month":"2023-12","months_since":1,"cohort_mrr":9856.44,"base_mrr":9856.44,"retention_pct":100.0},{"cohort_month":"2023-11","period_month":"2024-01","months_since":2,"cohort_mrr":9856.44,"base_mrr":9856.44,"retention_pct":100.0},{"cohort_month":"2023-11","period_month":"2024-02","months_since":3,"cohort_mrr":9856.44,"base_mrr":9856.44,"retention_pct":100.0},{"cohort_month":"2023-11","period_month":"2024-03","months_since":4,"cohort_mrr":10906.74,"base_mrr":9856.44,"retention_pct":110.7},{"cohort_month":"2023-11","period_month":"2024-04","months_since":5,"cohort_mrr":11352.05,"base_mrr":9856.44,"retention_pct":115.2},{"cohort_month":"2023-11","period_month":"2024-05","months_since":6,"cohort_mrr":9993.92,"base_mrr":9856.44,"retention_pct":101.4},{"cohort_month":"2023-11","period_month":"2024-06","months_since":7,"cohort_mrr":9993.92,"base_mrr":9856.44,"retention_pct":101.4},{"cohort_month":"2023-11","period_month":"2024-07","months_since":8,"cohort_mrr":9993.92,"base_mrr":9856.44,"retention_pct":101.4},{"cohort_month":"2023-11","period_month":"2024-08","months_since":9,"cohort_mrr":9993.92,"base_mrr":9856.44,"retention_pct":101.4},{"cohort_month":"2023-11","period_month":"2024-09","months_since":10,"cohort_mrr":9993.92,"base_mrr":9856.44,"retention_pct":101.4},{"cohort_month":"2023-11","period_month":"2024-10","months_since":11,"cohort_mrr":9993.92,"base_mrr":9856.44,"retention_pct":101.4},{"cohort_month":"2023-11","period_month":"2024-11","months_since":12,"cohort_mrr":9993.92,"base_mrr":9856.44,"retention_pct":101.4},{"cohort_month":"2023-11","period_month":"2024-12","months_since":13,"cohort_mrr":9993.92,"base_mrr":9856.44,"retention_pct":101.4},{"cohort_month":"2023-12","period_month":"2023-12","months_since":0,"cohort_mrr":2948.71,"base_mrr":2948.71,"retention_pct":100.0},{"cohort_month":"2023-12","period_month":"2024-01","months_since":1,"cohort_mrr":2948.71,"base_mrr":2948.71,"retention_pct":100.0},{"cohort_month":"2023-12","period_month":"2024-02","months_since":2,"cohort_mrr":2948.71,"base_mrr":2948.71,"retention_pct":100.0},{"cohort_month":"2023-12","period_month":"2024-03","months_since":3,"cohort_mrr":2948.71,"base_mrr":2948.71,"retention_pct":100.0},{"cohort_month":"2023-12","period_month":"2024-04","months_since":4,"cohort_mrr":2948.71,"base_mrr":2948.71,"retention_pct":100.0},{"cohort_month":"2023-12","period_month":"2024-05","months_since":5,"cohort_mrr":2948.71,"base_mrr":2948.71,"retention_pct":100.0},{"cohort_month":"2023-12","period_month":"2024-06","months_since":6,"cohort_mrr":1873.48,"base_mrr":2948.71,"retention_pct":63.5},{"cohort_month":"2023-12","period_month":"2024-07","months_since":7,"cohort_mrr":1873.48,"base_mrr":2948.71,"retention_pct":63.5},{"cohort_month":"2023-12","period_month":"2024-08","months_since":8,"cohort_mrr":1873.48,"base_mrr":2948.71,"retention_pct":63.5},{"cohort_month":"2023-12","period_month":"2024-09","months_since":9,"cohort_mrr":622.12,"base_mrr":2948.71,"retention_pct":21.1},{"cohort_month":"2023-12","period_month":"2024-10","months_since":10,"cohort_mrr":622.12,"base_mrr":2948.71,"retention_pct":21.1},{"cohort_month":"2023-12","period_month":"2024-11","months_since":11,"cohort_mrr":622.12,"base_mrr":2948.71,"retention_pct":21.1},{"cohort_month":"2023-12","period_month":"2024-12","months_since":12,"cohort_mrr":622.12,"base_mrr":2948.71,"retention_pct":21.1},{"cohort_month":"2024-01","period_month":"2024-01","months_since":0,"cohort_mrr":17217.7,"base_mrr":17217.7,"retention_pct":100.0},{"cohort_month":"2024-01","period_month":"2024-02","months_since":1,"cohort_mrr":17217.7,"base_mrr":17217.7,"retention_pct":100.0},{"cohort_month":"2024-01","period_month":"2024-03","months_since":2,"cohort_mrr":17217.7,"base_mrr":17217.7,"retention_pct":100.0},{"cohort_month":"2024-01","period_month":"2024-04","months_since":3,"cohort_mrr":17217.7,"base_mrr":17217.7,"retention_pct":100.0},{"cohort_month":"2024-01","period_month":"2024-05","months_since":4,"cohort_mrr":17217.7,"base_mrr":17217.7,"retention_pct":100.0},{"cohort_month":"2024-01","period_month":"2024-06","months_since":5,"cohort_mrr":4882.0,"base_mrr":17217.7,"retention_pct":28.4},{"cohort_month":"2024-01","period_month":"2024-07","months_since":6,"cohort_mrr":4882.0,"base_mrr":17217.7,"retention_pct":28.4},{"cohort_month":"2024-01","period_month":"2024-08","months_since":7,"cohort_mrr":4882.0,"base_mrr":17217.7,"retention_pct":28.4},{"cohort_month":"2024-01","period_month":"2024-09","months_since":8,"cohort_mrr":4882.0,"base_mrr":17217.7,"retention_pct":28.4},{"cohort_month":"2024-01","period_month":"2024-10","months_since":9,"cohort_mrr":4882.0,"base_mrr":17217.7,"retention_pct":28.4},{"cohort_month":"2024-01","period_month":"2024-11","months_since":10,"cohort_mrr":4882.0,"base_mrr":17217.7,"retention_pct":28.4},{"cohort_month":"2024-01","period_month":"2024-12","months_since":11,"cohort_mrr":4882.0,"base_mrr":17217.7,"retention_pct":28.4},{"cohort_month":"2024-02","period_month":"2024-02","months_since":0,"cohort_mrr":20290.47,"base_mrr":20290.47,"retention_pct":100.0},{"cohort_month":"2024-02","period_month":"2024-03","months_since":1,"cohort_mrr":20290.47,"base_mrr":20290.47,"retention_pct":100.0},{"cohort_month":"2024-02","period_month":"2024-04","months_since":2,"cohort_mrr":20661.62,"base_mrr":20290.47,"retention_pct":101.8},{"cohort_month":"2024-02","period_month":"2024-05","months_since":3,"cohort_mrr":20661.62,"base_mrr":20290.47,"retention_pct":101.8},{"cohort_month":"2024-02","period_month":"2024-06","months_since":4,"cohort_mrr":21389.66,"base_mrr":20290.47,"retention_pct":105.4},{"cohort_month":"2024-02","period_month":"2024-07","months_since":5,"cohort_mrr":21389.66,"base_mrr":20290.47,"retention_pct":105.4},{"cohort_month":"2024-02","period_month":"2024-08","months_since":6,"cohort_mrr":21389.66,"base_mrr":20290.47,"retention_pct":105.4},{"cohort_month":"2024-02","period_month":"2024-09","months_since":7,"cohort_mrr":21389.66,"base_mrr":20290.47,"retention_pct":105.4},{"cohort_month":"2024-02","period_month":"2024-10","months_since":8,"cohort_mrr":21389.66,"base_mrr":20290.47,"retention_pct":105.4},{"cohort_month":"2024-02","period_month":"2024-11","months_since":9,"cohort_mrr":21389.66,"base_mrr":20290.47,"retention_pct":105.4},{"cohort_month":"2024-02","period_month":"2024-12","months_since":10,"cohort_mrr":21389.66,"base_mrr":20290.47,"retention_pct":105.4},{"cohort_month":"2024-03","period_month":"2024-03","months_since":0,"cohort_mrr":4197.25,"base_mrr":4197.25,"retention_pct":100.0},{"cohort_month":"2024-03","period_month":"2024-04","months_since":1,"cohort_mrr":3567.61,"base_mrr":4197.25,"retention_pct":85.0},{"cohort_month":"2024-03","period_month":"2024-05","months_since":2,"cohort_mrr":4104.47,"base_mrr":4197.25,"retention_pct":97.8},{"cohort_month":"2024-03","period_month":"2024-06","months_since":3,"cohort_mrr":3567.61,"base_mrr":4197.25,"retention_pct":85.0},{"cohort_month":"2024-03","period_month":"2024-07","months_since":4,"cohort_mrr":5119.05,"base_mrr":4197.25,"retention_pct":122.0},{"cohort_month":"2024-03","period_month":"2024-08","months_since":5,"cohort_mrr":5148.58,"base_mrr":4197.25,"retention_pct":122.7},{"cohort_month":"2024-03","period_month":"2024-09","months_since":6,"cohort_mrr":5240.38,"base_mrr":4197.25,"retention_pct":124.9},{"cohort_month":"2024-03","period_month":"2024-10","months_since":7,"cohort_mrr":5554.13,"base_mrr":4197.25,"retention_pct":132.3},{"cohort_month":"2024-03","period_month":"2024-11","months_since":8,"cohort_mrr":5423.15,"base_mrr":4197.25,"retention_pct":129.2},{"cohort_month":"2024-03","period_month":"2024-12","months_since":9,"cohort_mrr":5700.54,"base_mrr":4197.25,"retention_pct":135.8},{"cohort_month":"2024-04","period_month":"2024-04","months_since":0,"cohort_mrr":3805.9,"base_mrr":3805.9,"retention_pct":100.0},{"cohort_month":"2024-04","period_month":"2024-05","months_since":1,"cohort_mrr":3637.45,"base_mrr":3805.9,"retention_pct":95.6},{"cohort_month":"2024-04","period_month":"2024-06","months_since":2,"cohort_mrr":3638.82,"base_mrr":3805.9,"retention_pct":95.6},{"cohort_month":"2024-04","period_month":"2024-07","months_since":3,"cohort_mrr":3944.01,"base_mrr":3805.9,"retention_pct":103.6},{"cohort_month":"2024-04","period_month":"2024-08","months_since":4,"cohort_mrr":3637.45,"base_mrr":3805.9,"retention_pct":95.6},{"cohort_month":"2024-04","period_month":"2024-09","months_since":5,"cohort_mrr":3802.17,"base_mrr":3805.9,"retention_pct":99.9},{"cohort_month":"2024-04","period_month":"2024-10","months_since":6,"cohort_mrr":3797.28,"base_mrr":3805.9,"retention_pct":99.8},{"cohort_month":"2024-04","period_month":"2024-11","months_since":7,"cohort_mrr":3637.45,"base_mrr":3805.9,"retention_pct":95.6},{"cohort_month":"2024-04","period_month":"2024-12","months_since":8,"cohort_mrr":3852.58,"base_mrr":3805.9,"retention_pct":101.2},{"cohort_month":"2024-05","period_month":"2024-05","months_since":0,"cohort_mrr":13347.91,"base_mrr":13347.91,"retention_pct":100.0},{"cohort_month":"2024-05","period_month":"2024-06","months_since":1,"cohort_mrr":13347.91,"base_mrr":13347.91,"retention_pct":100.0},{"cohort_month":"2024-05","period_month":"2024-07","months_since":2,"cohort_mrr":13347.91,"base_mrr":13347.91,"retention_pct":100.0},{"cohort_month":"2024-05","period_month":"2024-08","months_since":3,"cohort_mrr":13347.91,"base_mrr":13347.91,"retention_pct":100.0},{"cohort_month":"2024-05","period_month":"2024-09","months_since":4,"cohort_mrr":13347.91,"base_mrr":13347.91,"retention_pct":100.0},{"cohort_month":"2024-05","period_month":"2024-10","months_since":5,"cohort_mrr":13347.91,"base_mrr":13347.91,"retention_pct":100.0},{"cohort_month":"2024-05","period_month":"2024-11","months_since":6,"cohort_mrr":12868.97,"base_mrr":13347.91,"retention_pct":96.4},{"cohort_month":"2024-05","period_month":"2024-12","months_since":7,"cohort_mrr":12868.97,"base_mrr":13347.91,"retention_pct":96.4}],"cohort_sizes":{"2023-01":4,"2023-02":2,"2023-03":4,"2023-04":6,"2023-05":2,"2023-06":7,"2023-07":2,"2023-08":5,"2023-09":2,"2023-10":2,"2023-11":2,"2023-12":2,"2024-01":2,"2024-02":3,"2024-03":2,"2024-04":2,"2024-05":1}};
+
+// ── Page switching ────────────────────────────────────────────────────────
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ── Formatters ────────────────────────────────────────────────────────────
+const $k = v => v == null ? '-' : '$' + Math.round(v).toLocaleString();
+const $m = v => v == null ? '-' : '$' + (v/1000).toFixed(0) + 'k';
+const pct = v => v == null ? '-' : v.toFixed(1) + '%';
+const num = v => v == null ? '-' : Math.round(v).toLocaleString();
+const x   = v => v == null ? '-' : v.toFixed(1) + 'x';
+
+// ── Colour palette ────────────────────────────────────────────────────────
+const C = {
+  blue:'#2563EB', green:'#059669', red:'#DC2626', amber:'#D97706',
+  purple:'#7C3AED', teal:'#0891B2', pink:'#DB2777', gray:'#6B7280',
+  blueA:'rgba(37,99,235,.15)', greenA:'rgba(5,150,105,.15)',
+  redA:'rgba(220,38,38,.15)',
+};
+
+const PERIODS = RAW.mrr.map(r => r.period_month);
+
+// ── Chart defaults ────────────────────────────────────────────────────────
+Chart.defaults.font.family = "'IBM Plex Sans', sans-serif";
+Chart.defaults.font.size   = 11;
+Chart.defaults.color       = '#6B7280';
+const gridOpts = { color:'#F1F5F9', drawBorder:false };
+const scaleOpts = { grid:gridOpts, ticks:{ maxTicksLimit:6 } };
+
+function baseOpts(extra={}) {
+  return {
+    responsive:true, maintainAspectRatio:true,
+    plugins:{ legend:{ position:'bottom', labels:{ boxWidth:10, padding:12, font:{size:10} } },
+              tooltip:{ backgroundColor:'#0D1117', titleColor:'#fff', bodyColor:'#D1D5DB',
+                         padding:8, cornerRadius:4, displayColors:true } },
+    ...extra
+  };
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PAGE 1: MRR WATERFALL
+// ══════════════════════════════════════════════════════════════════════════
+(function() {
+  const m = RAW.mrr;
+  const last = m[m.length-1];
+  const prev = m[m.length-2];
+
+  // KPI cards
+  const kpis = [
+    { label:'Total MRR', val:$k(last.total_mrr), sub:'Dec 2024',
+      delta: ((last.total_mrr-prev.total_mrr)/prev.total_mrr*100).toFixed(1)+'% MoM', dir:'up' },
+    { label:'ARR', val:$k(last.arr), sub:'Annualised run-rate', delta:'', dir:'neutral' },
+    { label:'Active Customers', val:last.active_customers, sub:'Non-trial paying', delta:'', dir:'neutral' },
+    { label:'New MRR (cumul.)', val:$k(m.reduce((s,r)=>s+r.new_mrr,0)), sub:'All time', delta:'', dir:'neutral' },
+    { label:'Net New MRR (cumul.)', val:$k(m.reduce((s,r)=>s+r.net_new_mrr,0)), sub:'All time', delta:'', dir:'neutral' },
+  ];
+  document.getElementById('kpi-mrr').innerHTML = kpis.map(k => `
+    <div class="card">
+      <div class="card-title">${k.label}</div>
+      <div class="kpi-val">${k.val}</div>
+      <div class="kpi-sub">${k.sub}</div>
+      ${k.delta ? `<div class="kpi-delta ${k.dir}">${k.delta}</div>` : ''}
+    </div>`).join('');
+
+  // Stacked bar
+  new Chart(document.getElementById('c-mrr-stacked'), {
+    type:'bar',
+    data:{
+      labels: PERIODS,
+      datasets:[
+        { label:'New MRR',     data:m.map(r=>r.new_mrr),         backgroundColor:C.green },
+        { label:'Expansion',   data:m.map(r=>r.expansion_mrr),   backgroundColor:C.blue },
+        { label:'Contraction', data:m.map(r=>-r.contraction_mrr),backgroundColor:C.amber },
+        { label:'Churn',       data:m.map(r=>-r.churned_mrr),    backgroundColor:C.red },
+      ]
+    },
+    options:{ ...baseOpts(), scales:{ x:{ stacked:true,...scaleOpts, ticks:{maxRotation:45,font:{size:9}} },
+                                       y:{ stacked:true,...scaleOpts, ticks:{callback:v=>'$'+Math.abs(v/1000).toFixed(0)+'k'} } } }
+  });
+
+  // ARR trend
+  new Chart(document.getElementById('c-arr'), {
+    type:'line',
+    data:{
+      labels:PERIODS,
+      datasets:[{ label:'ARR', data:m.map(r=>r.arr), borderColor:C.blue,
+                  backgroundColor:C.blueA, fill:true, tension:.3, pointRadius:2 }]
+    },
+    options:{ ...baseOpts({ plugins:{legend:{display:false}} }),
+              scales:{ x:{...scaleOpts,ticks:{maxRotation:45,font:{size:9}}},
+                       y:{...scaleOpts,ticks:{callback:v=>'$'+Math.round(v/1000)+'k'}} } }
+  });
+
+  // Table
+  const hd = ['Period','New MRR','Expansion','Contraction','Churn','Net New MRR','Total MRR','ARR','Customers'];
+  document.getElementById('t-mrr').innerHTML =
+    `<tr>${hd.map(h=>`<th>${h}</th>`).join('')}</tr>` +
+    m.map(r => `<tr>
+      <td>${r.period_month}</td><td>${$k(r.new_mrr)}</td><td>${$k(r.expansion_mrr)}</td>
+      <td style="color:${C.red}">(${$k(r.contraction_mrr).slice(1)})</td>
+      <td style="color:${C.red}">(${$k(r.churned_mrr).slice(1)})</td>
+      <td style="color:${r.net_new_mrr>=0?C.green:C.red};font-weight:600">${$k(r.net_new_mrr)}</td>
+      <td>${$k(r.total_mrr)}</td><td>${$k(r.arr)}</td><td>${r.active_customers}</td>
+    </tr>`).join('');
+})();
+
+// ══════════════════════════════════════════════════════════════════════════
+// PAGE 2: NRR / GRR
+// ══════════════════════════════════════════════════════════════════════════
+(function() {
+  const n = RAW.nrr;
+  const m = RAW.mrr;
+  const last_n = n[n.length-1];
+
+  document.getElementById('kpi-nrr').innerHTML = [
+    { label:'Latest NRR', val:pct(last_n.nrr_pct), sub:last_n.period_month,
+      delta: last_n.nrr_pct>=100 ? 'Growing without new customers' : 'Below 100% — net contraction',
+      dir: last_n.nrr_pct>=100 ? 'up' : 'down' },
+    { label:'Latest GRR', val:pct(last_n.grr_pct), sub:'Excl. expansion',
+      delta: 'Floor churn rate '+(100-last_n.grr_pct).toFixed(1)+'%', dir:'neutral' },
+    { label:'NRR Range', val:pct(Math.min(...n.map(r=>r.nrr_pct)))+' – '+pct(Math.max(...n.map(r=>r.nrr_pct))),
+      sub:'Min – Max over 12mo', delta:'', dir:'neutral' },
+    { label:'Avg NRR (12mo)', val:pct(n.reduce((s,r)=>s+r.nrr_pct,0)/n.length),
+      sub:'Rolling average', delta:'', dir:'neutral' },
+    { label:'Periods Measured', val:n.length+' months', sub:'12-month lookback', delta:'', dir:'neutral' },
+  ].map(k=>`<div class="card">
+    <div class="card-title">${k.label}</div>
+    <div class="kpi-val" style="font-size:18px">${k.val}</div>
+    <div class="kpi-sub">${k.sub}</div>
+    ${k.delta?`<div class="kpi-delta ${k.dir}">${k.delta}</div>`:''}
+  </div>`).join('');
+
+  new Chart(document.getElementById('c-nrr'), {
+    type:'line',
+    data:{
+      labels:n.map(r=>r.period_month),
+      datasets:[
+        { label:'NRR %', data:n.map(r=>r.nrr_pct), borderColor:C.blue,
+          backgroundColor:C.blueA, fill:true, tension:.3, pointRadius:3 },
+        { label:'GRR %', data:n.map(r=>r.grr_pct), borderColor:C.teal,
+          backgroundColor:'rgba(8,145,178,.1)', fill:true, tension:.3, pointRadius:3,
+          borderDash:[5,3] },
+        { label:'100% Baseline', data:n.map(()=>100), borderColor:'#CBD5E1',
+          borderDash:[3,3], pointRadius:0 }
+      ]
+    },
+    options:{ ...baseOpts(), scales:{
+      x:{...scaleOpts,ticks:{maxRotation:45,font:{size:9}}},
+      y:{...scaleOpts,ticks:{callback:v=>v+'%'},suggestedMin:60,suggestedMax:120}
+    }}
+  });
+
+  new Chart(document.getElementById('c-net-new'), {
+    type:'bar',
+    data:{
+      labels:PERIODS,
+      datasets:[{ label:'Net New MRR', data:m.map(r=>r.net_new_mrr),
+        backgroundColor:m.map(r=>r.net_new_mrr>=0?C.green:C.red) }]
+    },
+    options:{ ...baseOpts({plugins:{legend:{display:false}}}),
+      scales:{x:{...scaleOpts,ticks:{maxRotation:45,font:{size:9}}},
+              y:{...scaleOpts,ticks:{callback:v=>'$'+Math.round(v/1000)+'k'}}} }
+  });
+
+  const nh = ['Period','Starting MRR','Ending MRR','NRR','GRR'];
+  document.getElementById('t-nrr').innerHTML =
+    `<tr>${nh.map(h=>`<th>${h}</th>`).join('')}</tr>` +
+    n.map(r=>`<tr>
+      <td>${r.period_month}</td><td>${$k(r.starting_mrr)}</td><td>${$k(r.ending_mrr)}</td>
+      <td style="font-weight:600;color:${r.nrr_pct>=100?C.green:C.red}">${pct(r.nrr_pct)}</td>
+      <td style="color:${C.teal}">${pct(r.grr_pct)}</td>
+    </tr>`).join('');
+})();
+
+// ══════════════════════════════════════════════════════════════════════════
+// PAGE 3: COHORT HEATMAP
+// ══════════════════════════════════════════════════════════════════════════
+(function() {
+  const coh = RAW.coh;
+  const cohorts = RAW.coh_periods;
+  const maxMonths = Math.max(...coh.map(r=>r.months_since));
+
+  function heatClass(v) {
+    if (v >= 100) return 'hm-100';
+    if (v >= 90)  return 'hm-90';
+    if (v >= 80)  return 'hm-80';
+    if (v >= 70)  return 'hm-70';
+    if (v >= 60)  return 'hm-60';
+    if (v >= 50)  return 'hm-50';
+    return 'hm-low';
+  }
+
+  // Build lookup
+  const lookup = {};
+  coh.forEach(r => {
+    if (!lookup[r.cohort_month]) lookup[r.cohort_month] = {};
+    lookup[r.cohort_month][r.months_since] = r.retention_pct;
+  });
+
+  const months = Array.from({length:maxMonths+1},(_,i)=>i);
+  let html = '<table class="heatmap"><tr><th>Cohort</th><th>n</th>' +
+    months.map(m=>`<th>M+${m}</th>`).join('') + '</tr>';
+
+  cohorts.forEach(c => {
+    const n = RAW.cohort_sizes[c] || 0;
+    const nColor = n < 3 ? '#DC2626' : n < 5 ? '#D97706' : '#374151';
+    html += `<tr><td style="font-weight:500;white-space:nowrap">${c}</td><td style="color:${nColor};font-weight:600;background:#F8FAFC">${n}</td>`;
+    months.forEach(m => {
+      const v = lookup[c] && lookup[c][m] != null ? lookup[c][m] : null;
+      if (v == null) html += `<td class="hm-na">—</td>`;
+      else html += `<td class="${heatClass(v)}">${v.toFixed(0)}%</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</table>';
+  document.getElementById('cohort-heatmap').innerHTML = html;
+
+  // Line chart — top 6 cohorts
+  const top = cohorts.slice(0,6);
+  const colors = [C.blue, C.green, C.amber, C.purple, C.teal, C.pink];
+  new Chart(document.getElementById('c-cohort-lines'), {
+    type:'line',
+    data:{
+      labels: months.map(m=>`M+${m}`),
+      datasets: top.map((c,i) => ({
+        label: c,
+        data: months.map(m => lookup[c] && lookup[c][m] != null ? lookup[c][m] : null),
+        borderColor: colors[i], tension:.3, pointRadius:2, spanGaps:false,
+      }))
+    },
+    options:{ ...baseOpts(), scales:{
+      x:{...scaleOpts}, y:{...scaleOpts,ticks:{callback:v=>v+'%'},suggestedMin:0,suggestedMax:130}
+    }}
+  });
+})();
+
+// ══════════════════════════════════════════════════════════════════════════
+// PAGE 4: LTV:CAC
+// ══════════════════════════════════════════════════════════════════════════
+let ltvSeg = 'All';
+function filterSeg(el, seg) {
+  document.querySelectorAll('.seg-pill').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  ltvSeg = seg;
+  renderLTV();
+}
+
+function renderLTV() {
+  const all = RAW.ltv;
+  const segs = ltvSeg === 'All' ? ['SMB','Mid-Market','Enterprise'] : [ltvSeg];
+
+  // Latest period per segment
+  const latest = {};
+  all.forEach(r => { if (segs.includes(r.segment)) latest[r.segment] = r; });
+  const latestArr = Object.values(latest);
+
+  document.getElementById('kpi-ltv').innerHTML = [
+    { label:'Avg LTV', val:$k(latestArr.reduce((s,r)=>s+(r.ltv||0),0)/latestArr.length), sub:'Latest period avg', delta:'', dir:'neutral' },
+    { label:'Avg CAC', val:$k(latestArr.reduce((s,r)=>s+(r.cac||0),0)/Math.max(latestArr.filter(r=>r.cac).length,1)), sub:'Commission-based', delta:'', dir:'neutral' },
+    { label:'LTV:CAC', val:x(latestArr.reduce((s,r)=>s+(r.ltv_cac_ratio||0),0)/Math.max(latestArr.filter(r=>r.ltv_cac_ratio).length,1)), sub:'Target ≥ 3×', delta:'', dir:'neutral' },
+    { label:'Payback', val:(latestArr.reduce((s,r)=>s+(r.payback_months||0),0)/Math.max(latestArr.filter(r=>r.payback_months).length,1)).toFixed(0)+' mo', sub:'Avg months', delta:'', dir:'neutral' },
+    { label:'Gross Margin', val:'72%', sub:'Model assumption', delta:'', dir:'neutral' },
+  ].map(k=>`<div class="card">
+    <div class="card-title">${k.label}</div>
+    <div class="kpi-val" style="font-size:20px">${k.val}</div>
+    <div class="kpi-sub">${k.sub}</div>
+  </div>`).join('');
+
+  // By segment, latest period only
+  const segColors = {SMB:C.blue,'Mid-Market':C.green,Enterprise:C.purple};
+  const periods_with_cac = [...new Set(all.filter(r=>r.cac && segs.includes(r.segment)).map(r=>r.period_month))].sort();
+  const last8 = periods_with_cac.slice(-8);
+
+  if (window.ltvChart1) window.ltvChart1.destroy();
+  window.ltvChart1 = new Chart(document.getElementById('c-ltvcac'), {
+    type:'bar',
+    data:{
+      labels:last8,
+      datasets: segs.map(s=>({
+        label:s,
+        data:last8.map(p=>{ const r=all.find(x=>x.period_month===p&&x.segment===s); return r?r.ltv_cac_ratio:null; }),
+        backgroundColor:segColors[s]+'99', borderColor:segColors[s], borderWidth:1.5
+      }))
+    },
+    options:{ ...baseOpts(), scales:{
+      x:{...scaleOpts,ticks:{maxRotation:45,font:{size:9}}},
+      y:{...scaleOpts,ticks:{callback:v=>v+'×'}}
+    }}
+  });
+
+  if (window.ltvChart2) window.ltvChart2.destroy();
+  window.ltvChart2 = new Chart(document.getElementById('c-payback'), {
+    type:'bar',
+    data:{
+      labels:last8,
+      datasets: segs.map(s=>({
+        label:s,
+        data:last8.map(p=>{ const r=all.find(x=>x.period_month===p&&x.segment===s); return r?r.payback_months:null; }),
+        backgroundColor:segColors[s]+'99', borderColor:segColors[s], borderWidth:1.5
+      }))
+    },
+    options:{ ...baseOpts(), scales:{
+      x:{...scaleOpts,ticks:{maxRotation:45,font:{size:9}}},
+      y:{...scaleOpts,ticks:{callback:v=>v+' mo'}}
+    }}
+  });
+
+  // Table
+  const filtered = all.filter(r=>segs.includes(r.segment)&&r.cac).slice(-30);
+  document.getElementById('t-ltv').innerHTML =
+    `<tr><th>Period</th><th>Segment</th><th>Active</th><th>Avg MRR</th><th>Churn%</th><th>LTV</th><th>CAC</th><th>LTV:CAC</th><th>Payback</th></tr>` +
+    filtered.map(r=>`<tr>
+      <td>${r.period_month}</td><td>${r.segment}</td><td>${r.active_customers}</td>
+      <td>${$k(r.avg_mrr)}</td><td>${pct(r.monthly_churn_rate_pct)}</td>
+      <td>${$k(r.ltv)}</td><td>${r.cac?$k(r.cac):'-'}</td>
+      <td style="font-weight:600;color:${r.ltv_cac_ratio>=3?C.green:r.ltv_cac_ratio<1?C.red:C.amber}">${r.ltv_cac_ratio?x(r.ltv_cac_ratio):'-'}</td>
+      <td>${r.payback_months?r.payback_months.toFixed(0)+' mo':'-'}</td>
+    </tr>`).join('');
+}
+renderLTV();
+
+// ══════════════════════════════════════════════════════════════════════════
+// PAGE 5: ASC 606 DISCLOSURES
+// ══════════════════════════════════════════════════════════════════════════
+(function() {
+  const b = RAW.bil;
+  const c = RAW.com;
+  const r = RAW.rpo;
+  const lastB = b[b.length-1];
+  const lastC = c[c.length-1];
+
+  const totalRPO = {};
+  r.forEach(row=>{ if (!totalRPO[row.period_month]) totalRPO[row.period_month]=0; totalRPO[row.period_month]+=row.rpo_total; });
+  const rpoArr = Object.entries(totalRPO).sort();
+  const lastRPO = rpoArr[rpoArr.length-1][1];
+
+  document.getElementById('kpi-asc606').innerHTML = [
+    { label:'Total Billings (all time)', val:$k(b.reduce((s,r2)=>s+r2.billings,0)), sub:'Cumulative', delta:'', dir:'neutral' },
+    { label:'Revenue Recognised', val:$k(b.reduce((s,r2)=>s+r2.revenue_recognized,0)), sub:'Cumulative', delta:'', dir:'neutral' },
+    { label:'Closing Deferred Rev', val:$k(lastB.deferred_balance), sub:'Contract liability', delta:'', dir:'neutral' },
+    { label:'Closing RPO', val:$k(lastRPO), sub:'Committed only', delta:'', dir:'neutral' },
+    { label:'Commission Asset', val:$k(lastC.closing_balance), sub:'ASC 340-40', delta:'', dir:'neutral' },
+  ].map(k=>`<div class="card">
+    <div class="card-title">${k.label}</div>
+    <div class="kpi-val" style="font-size:18px">${k.val}</div>
+    <div class="kpi-sub">${k.sub}</div>
+  </div>`).join('');
+
+  const pds = b.map(r2=>r2.period_month);
+
+  new Chart(document.getElementById('c-billings'), {
+    type:'line',
+    data:{
+      labels:pds,
+      datasets:[
+        { label:'Billings', data:b.map(r2=>r2.billings), borderColor:C.blue,
+          backgroundColor:C.blueA, fill:true, tension:.3, pointRadius:2 },
+        { label:'Revenue Recognised', data:b.map(r2=>r2.revenue_recognized), borderColor:C.green,
+          backgroundColor:C.greenA, fill:true, tension:.3, pointRadius:2 },
+      ]
+    },
+    options:{ ...baseOpts(), scales:{
+      x:{...scaleOpts,ticks:{maxRotation:45,font:{size:9}}},
+      y:{...scaleOpts,ticks:{callback:v=>'$'+Math.round(v/1000)+'k'}}
+    }}
+  });
+
+  new Chart(document.getElementById('c-deferred'), {
+    type:'bar',
+    data:{
+      labels:pds,
+      datasets:[
+        { label:'Deferred Revenue', data:b.map(r2=>r2.deferred_balance),
+          backgroundColor:C.amber+'99', borderColor:C.amber, borderWidth:1.5 },
+        { label:'Contract Asset', data:b.map(r2=>r2.contract_asset),
+          backgroundColor:C.teal+'99', borderColor:C.teal, borderWidth:1.5 },
+      ]
+    },
+    options:{ ...baseOpts(), scales:{
+      x:{...scaleOpts,ticks:{maxRotation:45,font:{size:9}}},
+      y:{...scaleOpts,ticks:{callback:v=>'$'+Math.round(v/1000)+'k'}}
+    }}
+  });
+
+  const rpo_periods = [...new Set(r.map(x=>x.period_month))].sort();
+  const products = ['Core','Analytics','DataPipeline'];
+  const rpo_lookup = {};
+  r.forEach(x=>{ if(!rpo_lookup[x.period_month]) rpo_lookup[x.period_month]={}; rpo_lookup[x.period_month][x.product]=x.rpo_total; });
+  new Chart(document.getElementById('c-rpo'), {
+    type:'bar',
+    data:{
+      labels:rpo_periods,
+      datasets:products.map((p,i)=>({
+        label:p,
+        data:rpo_periods.map(pd=>rpo_lookup[pd]?.[p]||0),
+        backgroundColor:[C.blue,C.green,C.teal][i]+'99',
+        borderColor:[C.blue,C.green,C.teal][i], borderWidth:1.5,
+        stack:'rpo'
+      }))
+    },
+    options:{ ...baseOpts(), scales:{
+      x:{stacked:true,...scaleOpts,ticks:{maxRotation:45,font:{size:9}}},
+      y:{stacked:true,...scaleOpts,ticks:{callback:v=>'$'+Math.round(v/1000)+'k'}}
+    }}
+  });
+
+  new Chart(document.getElementById('c-comm'), {
+    type:'line',
+    data:{
+      labels:c.map(r2=>r2.period_month),
+      datasets:[
+        { label:'Commission Asset', data:c.map(r2=>r2.closing_balance), borderColor:C.purple,
+          backgroundColor:C.purple+'22', fill:true, tension:.3, pointRadius:2 },
+        { label:'New Capitalised', data:c.map(r2=>r2.new_capitalized), borderColor:C.blue,
+          tension:.3, pointRadius:2, borderDash:[5,3] },
+        { label:'Amortised', data:c.map(r2=>-r2.amortized), borderColor:C.red,
+          tension:.3, pointRadius:2, borderDash:[5,3] },
+      ]
+    },
+    options:{ ...baseOpts(), scales:{
+      x:{...scaleOpts,ticks:{maxRotation:45,font:{size:9}}},
+      y:{...scaleOpts,ticks:{callback:v=>'$'+Math.round(Math.abs(v)/1000)+'k'}}
+    }}
+  });
+})();
+</script>
+</body>
+</html>
